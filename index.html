@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VYREL Feldkarte Bayerstetten</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VYREL Feldkarte">
+<meta name="theme-color" content="#161e24">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: Kabinen-Tablet – Live-Luftbild füllt die Fläche, rechts (schmal: unten) die Auftragsleiste */
+:root{
+  --bg:#edf0eb; --panel:#ffffff; --fg:#1a2420; --muted:#5a6a62; --line:#d3dbd5;
+  --chip:#eef2ef; --accent:#b86e00; --accent-fg:#ffffff; --sel:#ffb81c; --ok:#2e8b57; --warn:#c0392b;
+  --k1:#2b9ad0; --k2:#df5a2c; --k3:#b9479a;
+  --display:"Barlow Semi Condensed","Arial Narrow",sans-serif;
+  --body:"Barlow","Segoe UI",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f1417; --panel:#161e24; --fg:#e7eee9; --muted:#97a69e; --line:#28343c;
+  --chip:#1f2a31; --accent:#f2a516; --accent-fg:#1b1300; --ok:#5cc58a; --warn:#ff7b6b; color-scheme:dark}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--sel);outline-offset:2px}
+
+.app{height:100%;display:grid;grid-template-rows:auto minmax(0,1fr)}
+header{display:flex;align-items:center;gap:10px 22px;flex-wrap:wrap;background:var(--panel);border-bottom:1px solid var(--line);
+  padding-block:10px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.06em;display:flex;gap:10px;align-items:baseline}
+.brand span{font-weight:500;letter-spacing:.02em;color:var(--muted)}
+.steps{display:flex;gap:6px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.steps li{font-family:var(--display);font-weight:600;font-size:15px;padding:5px 12px;border-radius:999px;background:var(--chip);color:var(--muted);display:flex;gap:8px;align-items:center}
+.steps li b{font-family:var(--mono);font-size:12px;font-weight:500;opacity:.8}
+.steps li.on{background:var(--fg);color:var(--bg)}
+
+.main{display:grid;grid-template-columns:minmax(0,1fr) 380px;min-height:0}
+.mapwrap{position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#3f4b2e}
+aside{min-height:0;overflow:auto;background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;gap:22px;
+  padding-block:18px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+@media (max-width:860px){
+  .app{height:auto;min-height:100%}
+  .main{grid-template-columns:1fr;grid-template-rows:minmax(340px,68vh) auto}
+  aside{border-left:0;border-top:1px solid var(--line);overflow:visible}
+  header{padding-block:8px;gap:6px 14px}
+  .brand{font-size:19px}
+  .steps li{font-size:13px;padding:3px 9px}
+  .mbtn{height:40px;font-size:14px;padding:0 11px;border-radius:10px}
+  .mbtn .lg{display:none}
+  .leaflet-control-zoom a{width:38px!important;height:38px!important;line-height:38px!important}
+}
+.mbtn .sm{display:none}
+@media (max-width:860px){.mbtn .sm{display:inline}}
+.blocked{position:absolute;z-index:650;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92%,420px);background:rgba(16,22,18,.94);color:#fff;border-radius:16px;padding:18px 18px 16px;display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 24px rgba(0,0,0,.45)}
+.blocked b{font-family:var(--display);font-size:20px}
+.blocked p{margin:0;font-size:14.5px;line-height:1.45}
+.blocked button{align-self:flex-start;margin-top:6px}
+
+/* Karten-Bedienung */
+.mctl{position:absolute;z-index:500;display:flex;gap:8px}
+.mctl.tl{left:max(12px,env(safe-area-inset-left,0px));top:12px;flex-wrap:wrap;right:12px;pointer-events:none}
+.mctl.tl>*{pointer-events:auto}
+.mbtn{height:46px;border-radius:12px;border:0;background:rgba(16,22,18,.86);color:#fff;font-family:var(--display);font-weight:600;font-size:16px;padding:0 14px;box-shadow:0 2px 8px rgba(0,0,0,.35)}
+.mbtn.on{background:var(--sel);color:#1b1300}
+.drawbar{position:absolute;z-index:600;left:50%;bottom:16px;transform:translateX(-50%);display:flex;gap:8px;align-items:center;background:rgba(16,22,18,.9);color:#fff;padding:8px;border-radius:14px;max-width:calc(100% - 24px);flex-wrap:wrap;justify-content:center}
+.drawbar span{font-family:var(--display);font-size:16px;padding:0 6px}
+.toast{position:absolute;z-index:700;left:50%;top:66px;transform:translateX(-50%);background:var(--fg);color:var(--bg);font-family:var(--display);font-weight:600;font-size:17px;padding:9px 16px;border-radius:10px;pointer-events:none;opacity:0;transition:opacity .2s;white-space:nowrap}
+.toast.show{opacity:1}
+.leaflet-container{font-family:var(--body)}
+.flab{background:rgba(10,16,10,.72);border:0;color:#fff;font-family:var(--display);font-weight:600;font-size:14px;padding:3px 8px;border-radius:8px;box-shadow:none;white-space:nowrap}
+.flab::before{display:none}
+.flab small{font-family:var(--mono);font-size:11.5px;opacity:.9}
+.plab{background:transparent;border:0;box-shadow:none;color:#fff;font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.04em;text-shadow:0 1px 3px #000,0 0 6px #000}
+.plab::before{display:none}
+.leaflet-control-zoom a{width:44px!important;height:44px!important;line-height:44px!important;font-size:22px!important}
+
+/* Leiste */
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.02em;word-break:break-all}
+h2{font-family:var(--display);font-weight:700;font-size:30px;line-height:1.05;margin:4px 0 0;text-wrap:balance}
+h3{font-family:var(--display);font-weight:700;font-size:20px;margin:0;letter-spacing:.02em}
+.ha{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+.ha b{font-family:var(--display);font-weight:700;font-size:44px;line-height:1;font-variant-numeric:tabular-nums}
+.ha span{font-family:var(--display);font-size:20px;color:var(--muted)}
+.grp{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.lbl-s{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+.txt{height:46px;border-radius:12px;border:1.5px solid var(--line);background:var(--chip);padding:0 12px;font-size:17px;width:100%}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{min-height:46px;padding:0 15px;border-radius:23px;border:1.5px solid var(--line);background:var(--chip);font-family:var(--display);font-weight:600;font-size:17px;display:flex;align-items:center;gap:8px}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.chip .dot{width:12px;height:12px;border-radius:50%;flex:none}
+.chip.k[aria-pressed="true"]{color:#fff}
+.actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}
+.primary{height:56px;border:0;border-radius:14px;background:var(--accent);color:var(--accent-fg);font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.02em}
+.primary:disabled{opacity:.4;cursor:default}
+.ghost{height:46px;border-radius:12px;border:1.5px solid var(--line);background:transparent;font-family:var(--display);font-weight:600;font-size:16px}
+.ghost.danger{color:var(--warn)}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.howto{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:10px}
+.howto li{display:flex;gap:12px;align-items:flex-start}
+.howto b{font-family:var(--mono);font-weight:500;font-size:13px;width:26px;height:26px;border-radius:50%;background:var(--chip);display:grid;place-items:center;flex:none}
+.sum{display:flex;gap:16px;align-items:baseline;margin-top:6px;font-family:var(--display);font-size:17px;color:var(--muted)}
+.sum b{font-size:26px;color:var(--fg);font-variant-numeric:tabular-nums}
+.kgrp{margin-top:14px}
+.khead{display:flex;align-items:center;gap:8px;font-family:var(--display);font-weight:700;font-size:17px;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.khead .dot{width:12px;height:12px;border-radius:50%}
+.khead span:last-child{margin-left:auto;font-family:var(--mono);font-weight:500;font-size:13px;color:var(--muted)}
+.row{width:100%;display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;text-align:left;background:transparent;border:0;border-bottom:1px solid var(--line);padding:10px 2px;min-height:48px}
+.row:hover{background:var(--chip)}
+.row .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .st{font-family:var(--mono);font-size:12px;color:var(--muted)}
+.row .h{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);margin-top:8px}
+details.src{border-top:1px solid var(--line);padding-top:12px;margin-top:auto}
+details.src summary{font-family:var(--display);font-weight:600;font-size:16px;cursor:pointer}
+.stat{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:13.5px;margin-top:10px}
+.stat .d{width:10px;height:10px;border-radius:50%;margin-top:5px}
+.src select{width:100%;height:42px;border-radius:10px;border:1.5px solid var(--line);background:var(--chip);padding:0 8px;margin-top:8px}
+.src p{font-size:12.5px;color:var(--muted)}
+@media (prefers-reduced-motion: reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">VYREL <span>Feldkarte · Bayerstetten</span></div>
+    <ol class="steps" id="steps">
+      <li data-s="1"><b>1</b>Auf Feld zoomen</li>
+      <li data-s="2"><b>2</b>Feld antippen</li>
+      <li data-s="3"><b>3</b>Markieren</li>
+    </ol>
+  </header>
+  <div class="main">
+    <div class="mapwrap">
+      <div id="map" aria-label="Luftbild mit Feldstücken"></div>
+      <div class="mctl tl">
+        <button class="mbtn" id="bHome"><span class="lg">Bayerstetten</span><span class="sm">Hof</span></button>
+        <button class="mbtn" id="bLoc"><span class="lg">Mein Standort</span><span class="sm">Standort</span></button>
+        <button class="mbtn" id="bDraw"><span class="lg">Feld fehlt? Einzeichnen</span><span class="sm">+ Feld</span></button>
+      </div>
+      <div class="drawbar" id="drawbar" hidden>
+        <span id="drawTxt">Ecken des Feldes antippen</span>
+        <button class="mbtn" id="dUndo">Zurück</button>
+        <button class="mbtn on" id="dDone">Fertig</button>
+        <button class="mbtn" id="dCancel">Abbrechen</button>
+      </div>
+      <div class="toast" id="toast" role="status"></div>
+      <div class="blocked" id="blocked" hidden>
+        <b>Kein Luftbild</b>
+        <p>Diese Ansicht lässt keine Kartendaten aus dem Netz zu, zum Beispiel die Dateivorschau in der Claude-App.</p>
+        <p>Die Datei in Safari oder Chrome öffnen: am Mac per Doppelklick, am iPhone über eine Web-Adresse.</p>
+        <button class="mbtn" id="bBlockedOk">Trotzdem ohne Luftbild weiter</button>
+      </div>
+    </div>
+    <aside id="aside"></aside>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function(){
+/* ---------- Grundwerte ---------- */
+const HOME=[47.61596,10.49014];           // Bayerstetten, 87484 Nesselwang
+const LPIS='https://gdiserv.bayern.de/srv66381/services/invekos_lpis-wfs';
+const GSA ='https://gdiserv.bayern.de/srv66381/services/invekos_gsa-wfs';
+const KUNDEN=[{id:'k1',name:'Hof Huber'},{id:'k2',name:'Hof Berger'},{id:'k3',name:'Eigenbetrieb'}];
+const STEPS=[{id:'M',name:'Mähen'},{id:'W',name:'Wenden'},{id:'S',name:'Schwaden'},{id:'H',name:'Häckseln'},{id:'L',name:'Ladewagen'}];
+const KCOL={k1:'#2b9ad0',k2:'#df5a2c',k3:'#b9479a'};
+const SEL='#ffb81c';
+const fmtHa=v=>v.toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const stepStr=a=>STEPS.filter(s=>a.includes(s.id)).map(s=>s.id).join(' ');
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+/* ---------- UTM 32N (ETRS89) für Hektar und WFS ---------- */
+const D=Math.PI/180,A=6378137,F=1/298.257222101,E2=F*(2-F),EP2=E2/(1-E2),K0=0.9996,L0=9*D;
+function toUTM(lat,lon){const p=lat*D,l=lon*D,s=Math.sin(p),c=Math.cos(p),t=Math.tan(p);
+  const N=A/Math.sqrt(1-E2*s*s),T=t*t,C=EP2*c*c,Aa=c*(l-L0);
+  const M=A*((1-E2/4-3*E2*E2/64-5*E2**3/256)*p-(3*E2/8+3*E2*E2/32+45*E2**3/1024)*Math.sin(2*p)+(15*E2*E2/256+45*E2**3/1024)*Math.sin(4*p)-(35*E2**3/3072)*Math.sin(6*p));
+  const x=K0*N*(Aa+(1-T+C)*Aa**3/6+(5-18*T+T*T+72*C-58*EP2)*Aa**5/120)+500000;
+  const y=K0*(M+N*t*(Aa*Aa/2+(5-T+9*C+4*C*C)*Aa**4/24+(61-58*T+T*T+600*C-330*EP2)*Aa**6/720));return [x,y]}
+function fromUTM(x,y){x-=500000;const M=y/K0,mu=M/(A*(1-E2/4-3*E2*E2/64-5*E2**3/256)),e1=(1-Math.sqrt(1-E2))/(1+Math.sqrt(1-E2));
+  const p1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1*e1/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu)+(1097*e1**4/512)*Math.sin(8*mu);
+  const s=Math.sin(p1),c=Math.cos(p1),t=Math.tan(p1),N1=A/Math.sqrt(1-E2*s*s),T1=t*t,C1=EP2*c*c,R1=A*(1-E2)/Math.pow(1-E2*s*s,1.5),Dd=x/(N1*K0);
+  const lat=p1-(N1*t/R1)*(Dd*Dd/2-(5+3*T1+10*C1-4*C1*C1-9*EP2)*Dd**4/24+(61+90*T1+298*C1+45*T1*T1-252*EP2-3*C1*C1)*Dd**6/720);
+  const lon=L0+(Dd-(1+2*T1+C1)*Dd**3/6+(5-2*C1+28*T1-3*C1*C1+8*EP2+24*T1*T1)*Dd**5/120)/c;return [lat/D,lon/D]}
+function haOf(rings){let tot=0;rings.forEach((r,i)=>{let a=0;const u=r.map(q=>toUTM(q[0],q[1]));for(let j=0;j<u.length;j++){const p=u[j],q=u[(j+1)%u.length];a+=p[0]*q[1]-q[0]*p[1]}tot+=(i===0?1:-1)*Math.abs(a)/2});return Math.max(0,tot)/10000}
+
+/* ---------- Zustand ---------- */
+const KEY='vyrel-feldkarte-live-v1';
+let marks={},last={steps:['M','S','H'],kunde:'k1'},own=[];
+try{const s=JSON.parse(localStorage.getItem(KEY)||'null');if(s){marks=s.marks||{};last=s.last||last;own=s.own||[]}}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify({marks,last,own}))}catch(e){}};
+const fields=new Map();   // key -> {key,src,id,label,use,rings,ha,layer,tip}
+let selected=null,draft=null,confirmClear=false;
+const status={img:{t:'Luftbild wird geladen …',ok:null},fld:{t:'Feldstücke werden gesucht …',ok:null}};
+
+/* ---------- Karte ---------- */
+const map=L.map('map',{zoomControl:false,maxZoom:21,minZoom:11,tap:true}).setView(HOME,16);
+L.control.zoom({position:'bottomleft'}).addTo(map);
+L.control.scale({position:'bottomright',imperial:false,maxWidth:140}).addTo(map);
+L.tooltip({permanent:true,direction:'top',className:'plab',offset:[0,-4]}).setLatLng(HOME).setContent('Bayerstetten').addTo(map);
+
+const IMG=[
+ {name:'Bayern DOP20 (Kacheldienst)',make:()=>L.tileLayer('https://wmtsod1.bayernwolke.de/wmts/by_dop20c/smerc/{z}/{x}/{y}',{maxNativeZoom:19,maxZoom:21,attribution:'Luftbild: Bayerische Vermessungsverwaltung – www.geodaten.bayern.de'})},
+ {name:'Bayern DOP20 (WMS)',make:()=>L.tileLayer.wms('https://geoservices.bayern.de/od/wms/dop/v1/dop20',{layers:'by_dop20c',format:'image/jpeg',maxZoom:21,attribution:'Luftbild: Bayerische Vermessungsverwaltung – www.geodaten.bayern.de'})},
+ {name:'Esri World Imagery (Ersatz)',make:()=>L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxNativeZoom:19,maxZoom:21,attribution:'Luftbild: Esri, Maxar, Earthstar Geographics'})}
+];
+let imgIdx=0,imgLayer=null,anyTile=false;
+function useImg(i,auto){
+  if(imgLayer)map.removeLayer(imgLayer);imgIdx=i;let ok=false,err=0;
+  imgLayer=IMG[i].make().addTo(map);imgLayer.bringToBack();
+  status.img={t:IMG[i].name+' wird geladen …',ok:null};renderSrc();
+  imgLayer.on('tileload',()=>{anyTile=true;document.getElementById('blocked').hidden=true;if(!ok){ok=true;status.img={t:'Luftbild: '+IMG[i].name,ok:true};renderSrc()}});
+  imgLayer.on('tileerror',()=>{err++;if(!ok&&err>=5&&auto&&i<IMG.length-1){toast(IMG[i].name+' nicht erreichbar – nächste Quelle');useImg(i+1,true)}else if(!ok&&err>=5){status.img={t:IMG[i].name+' nicht erreichbar',ok:false};renderSrc();if(!anyTile)showBlocked()}});
+}
+useImg(0,true);
+let blockedDismissed=false;
+function showBlocked(){if(!anyTile&&!blockedDismissed)document.getElementById('blocked').hidden=false}
+setTimeout(showBlocked,9000);
+document.getElementById('bBlockedOk').onclick=()=>{blockedDismissed=true;document.getElementById('blocked').hidden=true};
+
+const fieldPane=map.createPane('fields');fieldPane.style.zIndex=420;
+
+/* ---------- Feldstücke laden: amtlich (WFS) → OSM → selbst einzeichnen ---------- */
+let fldSrc='auto',wfsTypes=[],wfsType=null,wfsBase=null,useOsm=false,loadedBoxes=[],loading=false;
+const xmlDoc=t=>new DOMParser().parseFromString(t,'application/xml');
+const byLocal=(n,name)=>[...n.getElementsByTagNameNS('*',name)];
+
+async function discover(){
+  for(const base of [LPIS,GSA]){
+    try{
+      const r=await fetch(base+'?SERVICE=WFS&REQUEST=GetCapabilities',{mode:'cors'});
+      if(!r.ok)throw new Error('HTTP '+r.status);
+      const d=xmlDoc(await r.text());
+      byLocal(d,'FeatureType').forEach(ft=>{const n=byLocal(ft,'Name')[0];if(n)wfsTypes.push({base,name:n.textContent.trim(),title:((byLocal(ft,'Title')[0]||{}).textContent||'').trim()})});
+    }catch(e){console.warn('WFS',base,e)}
+  }
+  if(wfsTypes.length){
+    const rank=t=>{const s=(t.name+' '+t.title).toLowerCase();if(/landschaft|landscape|element/.test(s))return 9;if(/feldst|agricultural|parcel|referen/.test(s))return t.base===LPIS?0:2;if(t.base===GSA)return 3;return 5};
+    wfsTypes.sort((a,b)=>rank(a)-rank(b));wfsType=wfsTypes[0];
+    status.fld={t:'Feldstücke: amtlich (InVeKoS Bayern) – '+wfsType.name,ok:true};
+  }else{useOsm=true;status.fld={t:'Amtliche Feldstücke nicht erreichbar – Ersatz: OpenStreetMap',ok:false}}
+  renderSrc();loadView();
+}
+
+function parseGML(text){
+  const d=xmlDoc(text);const root=d.documentElement;
+  if(/Exception/i.test(root.localName))throw new Error(root.textContent.trim().slice(0,200));
+  const out=[];
+  const mems=[...byLocal(d,'member'),...byLocal(d,'featureMember')];
+  mems.forEach((m,mi)=>{
+    const f=m.firstElementChild;if(!f)return;
+    const id=f.getAttribute('gml:id')||f.getAttributeNS('http://www.opengis.net/gml/3.2','id')||f.getAttribute('fid')||('f'+mi);
+    const props={};
+    f.querySelectorAll('*').forEach(e=>{if(e.children.length)return;const ln=e.localName;if(/^(posList|pos|coordinates|lowerCorner|upperCorner)$/.test(ln))return;const v=e.textContent.trim();if(v&&!(ln in props))props[ln]=v;if(!v){const h=e.getAttribute('xlink:href');if(h&&!(ln in props))props[ln]=h}});
+    const polys=[];
+    byLocal(f,'exterior').forEach(ex=>{
+      const rings=[ex,...[...ex.parentNode.children].filter(c=>c.localName==='interior')].map(r=>ringCoords(r)).filter(r=>r.length>2);
+      if(rings.length)polys.push(rings);
+    });
+    polys.forEach((rings,pi)=>out.push({id:id+(polys.length>1?'-'+pi:''),props,rings}));
+  });
+  return out;
+}
+function ringCoords(r){
+  let nums=[],dim=2;const pl=byLocal(r,'posList')[0];
+  if(pl){dim=+(pl.getAttribute('srsDimension')||2);nums=pl.textContent.trim().split(/\s+/).map(Number)}
+  else{const ps=byLocal(r,'pos');if(ps.length)ps.forEach(p=>{const v=p.textContent.trim().split(/\s+/).map(Number);nums.push(v[0],v[1])});
+    else{const cs=byLocal(r,'coordinates')[0];if(cs)cs.textContent.trim().split(/\s+/).forEach(t=>{const v=t.split(',').map(Number);nums.push(v[0],v[1])})}}
+  const ll=[];for(let i=0;i+1<nums.length;i+=dim){let x=nums[i],y=nums[i+1];if(x>1e6&&y<1e6){const t=x;x=y;y=t}ll.push(fromUTM(x,y))}
+  return ll;
+}
+function pickLabel(p){
+  const keys=Object.keys(p);
+  const k=keys.find(k=>/^(fid|feldstueck|feldstück|flik|id_?fs|localid|inspireid)/i.test(k))||keys.find(k=>/identif|localId|fid/i.test(k));
+  return k?String(p[k]).split(/[\/#]/).pop():'';
+}
+function pickUse(p){const k=Object.keys(p).find(k=>/nutz|crop|landuse|kultur|bodenbed|cover/i.test(k));return k?p[k]:''}
+
+async function loadWFS(b){
+  const sw=toUTM(b.getSouth(),b.getWest()),ne=toUTM(b.getNorth(),b.getEast()),nw=toUTM(b.getNorth(),b.getWest()),se=toUTM(b.getSouth(),b.getEast());
+  const minx=Math.min(sw[0],nw[0]),maxx=Math.max(ne[0],se[0]),miny=Math.min(sw[1],se[1]),maxy=Math.max(ne[1],nw[1]);
+  const u=wfsType.base+'?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES='+encodeURIComponent(wfsType.name)+
+    '&SRSNAME=urn:ogc:def:crs:EPSG::25832&COUNT=800&BBOX='+[minx,miny,maxx,maxy].map(v=>v.toFixed(1)).join(',')+',urn:ogc:def:crs:EPSG::25832';
+  const r=await fetch(u,{mode:'cors'});if(!r.ok)throw new Error('HTTP '+r.status);
+  const feats=parseGML(await r.text());
+  feats.forEach(f=>addField('amtlich',f.id,pickLabel(f.props),pickUse(f.props),f.rings));
+  return feats.length;
+}
+async function loadOSM(b){
+  const bb=[b.getSouth(),b.getWest(),b.getNorth(),b.getEast()].map(v=>v.toFixed(5)).join(',');
+  const q='[out:json][timeout:25];(way["landuse"~"^(meadow|farmland|grass)$"]('+bb+');relation["landuse"~"^(meadow|farmland)$"]('+bb+'););out geom;';
+  const r=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',body:'data='+encodeURIComponent(q),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const j=await r.json();let n=0;
+  j.elements.forEach(e=>{
+    const use={meadow:'Grünland',farmland:'Acker',grass:'Gras'}[e.tags&&e.tags.landuse]||'';
+    if(e.type==='way'&&e.geometry&&e.geometry.length>3){addField('osm','w'+e.id,e.tags.name||'',use,[e.geometry.map(p=>[p.lat,p.lon])]);n++}
+    if(e.type==='relation'&&e.members){e.members.filter(m=>m.role==='outer'&&m.geometry&&m.geometry.length>3).forEach((m,i)=>{const g=m.geometry;if(g[0].lat===g[g.length-1].lat&&g[0].lon===g[g.length-1].lon){addField('osm','r'+e.id+'-'+i,e.tags.name||'',use,[g.map(p=>[p.lat,p.lon])]);n++}})}
+  });
+  return n;
+}
+async function loadView(){
+  if(loading||map.getZoom()<14)return;
+  const b=map.getBounds();
+  if(loadedBoxes.some(x=>x.contains(b)))return;
+  const pb=b.pad(0.35);loading=true;
+  try{
+    let n;
+    if(!useOsm&&wfsType){try{n=await loadWFS(pb)}catch(e){console.warn(e);useOsm=true;status.fld={t:'Amtliche Feldstücke nicht abrufbar ('+e.message+'); der Server erlaubt den Abruf aus dem Browser vermutlich nicht – Ersatz: OpenStreetMap',ok:false};renderSrc()}}
+    if(useOsm)n=await loadOSM(pb);
+    loadedBoxes.push(pb);
+    const cnt=[...fields.values()].filter(f=>f.src!=='eigen').length;
+    status.fld.t=status.fld.t.replace(/ · \d+ Flächen geladen$/,'')+' · '+cnt+' Flächen geladen';renderSrc();if(!selected)render();
+  }catch(e){status.fld={t:'Keine Feldgrenzen abrufbar ('+e.message+'). Felder mit „Einzeichnen“ anlegen.',ok:false};renderSrc()}
+  loading=false;
+}
+map.on('moveend',()=>{loadView()});
+
+function addField(src,id,label,use,rings){
+  const key=src+':'+id;if(fields.has(key))return;
+  const ha=haOf(rings);if(src==='osm'&&ha<0.25)return;
+  const f={key,src,id,label,use,rings,ha};
+  f.layer=L.polygon(rings,{pane:'fields',color:'#fff',weight:1.4,opacity:.75,fillColor:'#fff',fillOpacity:.02}).addTo(map);
+  f.layer.on('click',ev=>{L.DomEvent.stop(ev);if(drawing){addPt(ev.latlng);return}select(key,true)});
+  fields.set(key,f);style(f);
+}
+own.forEach(o=>addField('eigen',o.id,o.label||'',o.use||'',o.rings));
+
+/* ---------- Auswahl und Markierung ---------- */
+const nameOf=f=>(marks[f.key]&&marks[f.key].name)||f.label&&(f.src==='osm'?f.label:'Feldstück '+f.label)||(f.src==='eigen'?'Eigenes Feld':'Feldstück');
+function style(f){
+  const mk=marks[f.key],sel=selected===f.key;
+  f.layer.setStyle(sel?{color:SEL,weight:4,opacity:1,fillColor:mk?KCOL[mk.kunde]:SEL,fillOpacity:mk?.5:.2}
+    :mk?{color:KCOL[mk.kunde],weight:2.6,opacity:1,fillColor:KCOL[mk.kunde],fillOpacity:.42}
+    :{color:'#fff',weight:1.4,opacity:.75,fillColor:'#fff',fillOpacity:.02});
+  if(sel)f.layer.bringToFront();
+  if(f.tip){f.layer.unbindTooltip();f.tip=null}
+  if(mk||sel){f.layer.bindTooltip('<b>'+esc(nameOf(f))+'</b><br><small>'+fmtHa(f.ha)+' ha'+(mk?' · '+stepStr(mk.steps):'')+'</small>',{permanent:true,direction:'center',className:'flab'});f.tip=true}
+}
+map.on('click',e=>{if(drawing){addPt(e.latlng);return}select(null)});
+function select(key,zoom){
+  const prev=selected;selected=key;confirmClear=false;
+  if(key){const m=marks[key];draft=m?{steps:m.steps.slice(),kunde:m.kunde,name:m.name||''}:{steps:last.steps.slice(),kunde:last.kunde,name:''};
+    if(zoom)map.flyToBounds(fields.get(key).layer.getBounds(),{padding:[60,60],maxZoom:18,duration:.5})}
+  else draft=null;
+  [prev,key].forEach(k=>{if(k&&fields.has(k))style(fields.get(k))});
+  render();
+}
+
+/* ---------- Einzeichnen ---------- */
+let drawing=false,dpts=[],dline=null;
+const drawbar=document.getElementById('drawbar');
+function startDraw(){select(null);drawing=true;dpts=[];drawbar.hidden=false;document.getElementById('bDraw').classList.add('on');updDraw()}
+function stopDraw(){drawing=false;dpts=[];if(dline){map.removeLayer(dline);dline=null}drawbar.hidden=true;document.getElementById('bDraw').classList.remove('on')}
+function addPt(ll){dpts.push([ll.lat,ll.lng]);updDraw()}
+function updDraw(){if(dline)map.removeLayer(dline);dline=dpts.length?L.polygon(dpts,{color:SEL,weight:3,dashArray:'6 6',fillOpacity:.15}).addTo(map):null;
+  document.getElementById('drawTxt').textContent=dpts.length<3?'Ecken des Feldes antippen ('+dpts.length+')':fmtHa(haOf([dpts]))+' ha · '+dpts.length+' Ecken';}
+document.getElementById('bDraw').onclick=()=>drawing?stopDraw():startDraw();
+document.getElementById('dUndo').onclick=()=>{dpts.pop();updDraw()};
+document.getElementById('dCancel').onclick=stopDraw;
+document.getElementById('dDone').onclick=()=>{if(dpts.length<3){toast('Mindestens 3 Ecken antippen');return}
+  const id='e'+Date.now().toString(36);own.push({id,rings:[dpts.slice()]});save();addField('eigen',id,'','',[dpts.slice()]);stopDraw();select('eigen:'+id,false)};
+
+/* ---------- Weitere Knöpfe ---------- */
+document.getElementById('bHome').onclick=()=>map.flyTo(HOME,16,{duration:.6});
+let locMk=null;
+document.getElementById('bLoc').onclick=()=>{
+  if(!navigator.geolocation){toast('Standort wird hier nicht unterstützt');return}
+  navigator.geolocation.getCurrentPosition(p=>{const ll=[p.coords.latitude,p.coords.longitude];
+    if(locMk)map.removeLayer(locMk);locMk=L.circleMarker(ll,{radius:9,color:'#fff',weight:3,fillColor:'#2b7bff',fillOpacity:1}).addTo(map);map.flyTo(ll,17,{duration:.6})},
+  ()=>toast('Standort nicht freigegeben'),{enableHighAccuracy:true,timeout:10000});
+};
+
+/* ---------- Leiste ---------- */
+const toastEl=document.getElementById('toast');let toastT=0;
+function toast(t){toastEl.textContent=t;toastEl.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>toastEl.classList.remove('show'),2000)}
+function render(){
+  const f=selected&&fields.get(selected);
+  document.querySelectorAll('#steps li').forEach(li=>li.classList.toggle('on',f?li.dataset.s==='3':li.dataset.s!=='3'));
+  document.getElementById('aside').innerHTML=(f?card(f):intro())+auftrag()+srcHTML();
+  bindSrc();
+}
+function intro(){
+  return '<section><h3>Feld markieren</h3><ol class="howto">'+
+    '<li><b>1</b><span>Mit zwei Fingern auf das Feld zoomen. Die Feldgrenzen erscheinen ab Ortsansicht von selbst.</span></li>'+
+    '<li><b>2</b><span>Feld antippen. Der Schlag leuchtet auf, die Hektar stehen daneben.</span></li>'+
+    '<li><b>3</b><span>Arbeitsgang und Kunde tippen, dann markieren. Beim nächsten Feld ist beides vorgewählt.</span></li></ol></section>';
+}
+function card(f){
+  const mk=marks[f.key];
+  const st=STEPS.map(x=>'<button class="chip" data-act="step" data-v="'+x.id+'" aria-pressed="'+draft.steps.includes(x.id)+'">'+x.name+'</button>').join('');
+  const ku=KUNDEN.map(k=>{const on=draft.kunde===k.id;return '<button class="chip k" data-act="kunde" data-v="'+k.id+'" aria-pressed="'+on+'"'+(on?' style="background:'+KCOL[k.id]+';border-color:'+KCOL[k.id]+'"':'')+'><i class="dot" style="background:'+(on?'#fff':KCOL[k.id])+'"></i>'+k.name+'</button>'}).join('');
+  const ok=draft.steps.length&&draft.kunde;
+  const srcTxt={amtlich:'Feldstückskarte Bayern',osm:'OpenStreetMap',eigen:'selbst eingezeichnet'}[f.src];
+  return '<section><div class="eyebrow">'+esc(srcTxt+(f.label?' · '+f.label:'')+(f.use?' · '+f.use:''))+'</div><h2>'+esc(nameOf(f))+'</h2>'+
+    '<div class="ha"><b>'+fmtHa(f.ha)+'</b><span>ha</span></div>'+
+    '<div class="grp"><label class="lbl-s" for="fname">Flurname (optional)</label><input class="txt" id="fname" placeholder="z. B. Moosacker" value="'+esc(draft.name)+'"></div>'+
+    '<div class="grp"><div class="lbl-s">Arbeitsgang</div><div class="chips">'+st+'</div></div>'+
+    '<div class="grp"><div class="lbl-s">Kunde</div><div class="chips">'+ku+'</div></div>'+
+    '<div class="actions"><button class="primary" data-act="mark"'+(ok?'':' disabled')+'>'+(mk?'Markierung speichern':'Feld markieren')+'</button>'+
+    (mk?'<button class="ghost danger" data-act="unmark">Markierung entfernen</button>':'')+
+    (f.src==='eigen'?'<button class="ghost danger" data-act="delown">Eingezeichnetes Feld löschen</button>':'')+
+    '<button class="ghost" data-act="close">Fertig, zurück zur Karte</button></div>'+
+    (ok?'':'<p class="note">Mindestens einen Arbeitsgang und einen Kunden wählen.</p>')+'</section>';
+}
+function auftrag(){
+  const ids=Object.keys(marks).filter(k=>fields.has(k));
+  const tot=ids.reduce((a,k)=>a+fields.get(k).ha,0);
+  let h='<section><h3>Auftrag</h3><div class="sum"><span><b>'+ids.length+'</b> Felder</span><span><b>'+fmtHa(tot)+'</b> ha</span></div>';
+  if(!ids.length)return h+'<p class="empty">Noch kein Feld markiert.</p></section>';
+  KUNDEN.forEach(k=>{
+    const fs=ids.map(i=>fields.get(i)).filter(f=>marks[f.key].kunde===k.id);if(!fs.length)return;
+    h+='<div class="kgrp"><div class="khead"><i class="dot" style="background:'+KCOL[k.id]+'"></i><span>'+k.name+'</span><span>'+fmtHa(fs.reduce((a,f)=>a+f.ha,0))+' ha</span></div>'+
+      fs.map(f=>'<button class="row" data-act="goto" data-v="'+esc(f.key)+'"><span class="n">'+esc(nameOf(f))+'</span><span class="st">'+stepStr(marks[f.key].steps)+'</span><span class="h">'+fmtHa(f.ha)+' ha</span></button>').join('')+'</div>';
+  });
+  h+='<div class="actions">'+(confirmClear?'<button class="ghost danger" data-act="clear2">Ja, alle Markierungen löschen</button><button class="ghost" data-act="clear0">Abbrechen</button>':'<button class="ghost" data-act="clear1">Alle Markierungen löschen</button>')+'</div>';
+  return h+'</section>';
+}
+const dot=ok=>'<i class="d" style="background:'+(ok===null?'var(--muted)':ok?'var(--ok)':'var(--warn)')+'"></i>';
+function srcHTML(){
+  return '<details class="src" id="srcBox"'+(srcOpen?' open':'')+'><summary>Datenquellen</summary><div class="stat" id="statBox">'+statInner()+'</div>'+
+   '<select id="selImg" aria-label="Luftbild">'+IMG.map((s,i)=>'<option value="'+i+'"'+(i===imgIdx?' selected':'')+'>Luftbild: '+s.name+'</option>').join('')+'</select>'+
+   (wfsTypes.length?'<select id="selFld" aria-label="Feldgrenzen">'+wfsTypes.map((t,i)=>'<option value="'+i+'"'+(!useOsm&&t===wfsType?' selected':'')+'>Grenzen: '+esc(t.title||t.name)+'</option>').join('')+'<option value="osm"'+(useOsm?' selected':'')+'>Grenzen: OpenStreetMap</option></select>':'')+
+   '<p>Luftbild und Feldstücke kommen live aus dem Netz. Im fertigen System liegen beide vorab offline auf dem Tablet. Markierungen bleiben nur in diesem Browser gespeichert.</p></details>';
+}
+function statInner(){return dot(status.img.ok)+'<span>'+esc(status.img.t)+'</span>'+dot(status.fld.ok)+'<span>'+esc(status.fld.t)+'</span>'}
+let srcOpen=false;
+function renderSrc(){const b=document.getElementById('statBox');if(b)b.innerHTML=statInner()}
+function bindSrc(){
+  const box=document.getElementById('srcBox');box.ontoggle=()=>{srcOpen=box.open};
+  document.getElementById('selImg').onchange=e=>useImg(+e.target.value,false);
+  const sf=document.getElementById('selFld');if(sf)sf.onchange=e=>{
+    for(const [k,f] of fields)if(f.src!=='eigen'&&!marks[k]){map.removeLayer(f.layer);fields.delete(k)}
+    loadedBoxes=[];
+    if(e.target.value==='osm'){useOsm=true;status.fld={t:'Feldgrenzen: OpenStreetMap',ok:true}}else{useOsm=false;wfsType=wfsTypes[+e.target.value];status.fld={t:'Feldstücke: amtlich – '+wfsType.name,ok:true}}
+    renderSrc();loadView();
+  };
+}
+const aside=document.getElementById('aside');
+aside.addEventListener('input',e=>{if(e.target.id==='fname'&&draft)draft.name=e.target.value});
+aside.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,v=b.dataset.v;
+  if(a==='step'){let st=draft.steps;if(st.includes(v))st=st.filter(x=>x!==v);else{st=st.concat(v);if(v==='H')st=st.filter(x=>x!=='L');if(v==='L')st=st.filter(x=>x!=='H')}draft.steps=st;render()}
+  else if(a==='kunde'){draft.kunde=v;render()}
+  else if(a==='mark'){const f=fields.get(selected);marks[selected]={steps:draft.steps.slice(),kunde:draft.kunde,name:draft.name.trim()};last={steps:draft.steps.slice(),kunde:draft.kunde};save();toast(nameOf(f)+' markiert · '+fmtHa(f.ha)+' ha');select(null)}
+  else if(a==='unmark'){delete marks[selected];save();toast('Markierung entfernt');select(null)}
+  else if(a==='delown'){const f=fields.get(selected);delete marks[f.key];own=own.filter(o=>'eigen:'+o.id!==f.key);map.removeLayer(f.layer);fields.delete(f.key);selected=null;draft=null;save();toast('Feld gelöscht');render()}
+  else if(a==='close')select(null);
+  else if(a==='goto')select(v,true);
+  else if(a==='clear1'){confirmClear=true;render()}
+  else if(a==='clear0'){confirmClear=false;render()}
+  else if(a==='clear2'){const ks=Object.keys(marks);marks={};save();confirmClear=false;ks.forEach(k=>fields.has(k)&&style(fields.get(k)));toast('Alle Markierungen gelöscht');render()}
+});
+
+render();
+discover();
+})();
+</script>
+</body>
+</html>
