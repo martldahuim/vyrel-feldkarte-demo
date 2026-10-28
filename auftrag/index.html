@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VYREL Auftrag">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}</style>
+</head>
+<body>
+<!-- Vorführung der Tablet-Seite AUFTRAG mit erfundenen Daten. Quelle: rtk/static/auftrag.html (Zweig feature/auftrag-stunden).
+     Läuft nicht auf einem Pi (Adresse ist kein 192.168.x), deshalb rechnet sie mit erfundenen Daten. -->
+<title>VYREL Auftrag</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="theme-color" content="#06090d">
+<!--
+  ============================================================================
+  VYREL · AUFTRAG — Felder, Kunde und Stunden auf dem Kabinen-Tablet
+  ============================================================================
+  Stand 28.10.2026. Erreichbar über die Anzeige (Menü → Auftrag) oder direkt:
+
+      http://192.168.60.1:8080/auftrag
+
+  feldtest.py reicht alles unter /auftrag an auftrag_dienst.py weiter
+  (eigener Prozess, nur 127.0.0.1). Fällt der Dienst aus, läuft die Messung
+  weiter; diese Seite sagt dann „Auftragsdienst antwortet nicht".
+
+  Dieselbe Datei ist die iPhone-Vorführung: Läuft sie nicht auf einem Pi
+  (Adresse kein 192.168.x / localhost, oder ?demo), rechnet sie mit
+  erfundenen Daten und sagt das oben in der Leiste.
+
+  Die Datei hat bewusst kein <html>/<head>: Der Pi setzt das Gerüst beim
+  Ausliefern davor, die Vorführung bekommt es beim Veröffentlichen.
+
+  Gestaltung aus static/anzeige.html: Bernsteingold auf fast Schwarz,
+  Rollenfarben (Häcksler kühles Blaugrau, Gespann warmes Grau), Tag und
+  Nacht als zwei eigene Farbsätze. Keine Schrift und nichts aus dem Netz.
+  ============================================================================
+-->
+<style>
+/* Layout: Karte links als Leinwand, rechts die Auftragsleiste; schmal: Karte oben, Leiste darunter.
+   Nacht zuerst (Kabine, Abend), Tag eigener Farbsatz gegen Sonne. */
+:root{
+  --grund:#06090d; --grund2:#0b1017; --karte:#0f151d; --karte-hoch:#17202b;
+  --linie:rgba(150,185,220,.14); --linie-hell:rgba(150,185,220,.26);
+  --text:#eef3f7; --still:rgba(208,222,236,.6); --leise:rgba(208,222,236,.22);
+  --gold:#e9ae47; --gold-hell:#ffd47e; --auf-gold:#15100a; --gold-flaeche:rgba(233,174,71,.16);
+  --mess:#5fd8ea; --gruen:#34c26b; --gelb:#f0c332; --rot:#ef4a3e;
+  --lead:#8aa0b8; --gespann:#c2b6a6; --feldgrund:#0c1209; --raster:rgba(95,216,234,.06);
+  --z-feldfahrt:#e9ae47; --z-feldstand:#8a6a33; --z-strasse:#5fd8ea; --z-silo:#b48ce0; --z-stand:#4f5d6c; --z-ohne:#7a2d28; --z-pause:#2a323c;
+  --f-text:"IBM Plex Sans",Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-eng:"IBM Plex Sans Condensed","Roboto Condensed","sans-serif-condensed","Arial Narrow",Roboto,system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono","Roboto Mono",ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){:root:not([data-theme="dark"]){
+  --grund:#e9ecef; --grund2:#dfe4e9; --karte:#f7f9fa; --karte-hoch:#ffffff;
+  --linie:rgba(15,21,27,.14); --linie-hell:rgba(15,21,27,.26);
+  --text:#0f151b; --still:rgba(15,21,27,.64); --leise:rgba(15,21,27,.22);
+  --gold:#a86a00; --gold-hell:#7a4c00; --auf-gold:#ffffff; --gold-flaeche:rgba(168,106,0,.14);
+  --mess:#00798c; --gruen:#1d8a46; --gelb:#9c7a00; --rot:#c62f24;
+  --lead:#3f5670; --gespann:#6d5f4c; --feldgrund:#dfe6d6; --raster:rgba(0,90,110,.08);
+  --z-feldfahrt:#c98a1c; --z-feldstand:#e6c27e; --z-strasse:#2a9bb0; --z-silo:#8d63bf; --z-stand:#9aa5b0; --z-ohne:#d97a72; --z-pause:#c9d0d7;
+  color-scheme:light}}
+:root[data-theme="light"]{
+  --grund:#e9ecef; --grund2:#dfe4e9; --karte:#f7f9fa; --karte-hoch:#ffffff;
+  --linie:rgba(15,21,27,.14); --linie-hell:rgba(15,21,27,.26);
+  --text:#0f151b; --still:rgba(15,21,27,.64); --leise:rgba(15,21,27,.22);
+  --gold:#a86a00; --gold-hell:#7a4c00; --auf-gold:#ffffff; --gold-flaeche:rgba(168,106,0,.14);
+  --mess:#00798c; --gruen:#1d8a46; --gelb:#9c7a00; --rot:#c62f24;
+  --lead:#3f5670; --gespann:#6d5f4c; --feldgrund:#dfe6d6; --raster:rgba(0,90,110,.08);
+  --z-feldfahrt:#c98a1c; --z-feldstand:#e6c27e; --z-strasse:#2a9bb0; --z-silo:#8d63bf; --z-stand:#9aa5b0; --z-ohne:#d97a72; --z-pause:#c9d0d7;
+  color-scheme:light}
+
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--grund);color:var(--text);font:15px/1.45 var(--f-text);-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--grund2)}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--gold-hell);outline-offset:2px}
+
+.app{min-height:100%;display:flex;flex-direction:column}
+.kopf{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap;
+  background:var(--grund2);border-bottom:1px solid var(--linie);padding-block:8px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.marke{font:700 18px var(--f-eng);letter-spacing:.14em}
+.marke b{color:var(--gold)}
+.rollechip{font:700 13px var(--f-eng);letter-spacing:.08em;text-transform:uppercase;padding:4px 10px;border-radius:999px;
+  background:var(--karte-hoch);box-shadow:inset 0 0 0 1px var(--linie-hell)}
+.rollechip i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:0}
+.kopf .rechts{margin-left:auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.uhr{font:600 15px var(--f-mono);font-variant-numeric:tabular-nums;color:var(--still)}
+.klein{min-height:40px;padding:0 12px;border-radius:10px;border:0;background:var(--karte-hoch);box-shadow:inset 0 0 0 1px var(--linie-hell);
+  font:600 14px var(--f-eng);letter-spacing:.04em;text-decoration:none;color:var(--text);display:inline-flex;align-items:center;gap:6px}
+.klein.an{background:var(--gold);color:var(--auf-gold);box-shadow:none}
+.demoband{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--gold-flaeche);color:var(--text);
+  border-bottom:1px solid var(--linie);padding-block:7px;font-size:13.5px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.demoband b{font-family:var(--f-eng);letter-spacing:.06em;color:var(--gold-hell)}
+.weg{background:rgba(239,74,62,.18);border-bottom:1px solid var(--rot);padding-block:8px;font-weight:600;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+.haupt{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,390px);min-height:0}
+.kartenfeld{position:relative;min-height:320px;background:var(--feldgrund)}
+.kartenfeld canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.kband{position:absolute;left:12px;right:12px;top:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.kband>*{pointer-events:auto}
+.kchip{background:rgba(6,9,13,.78);color:#eef3f7;font:600 13px var(--f-eng);letter-spacing:.04em;padding:6px 10px;border-radius:9px}
+.kwerk{position:absolute;right:12px;bottom:12px;display:flex;gap:8px}
+.kwerk button{min-width:46px;height:46px;border-radius:12px;border:0;background:rgba(6,9,13,.82);color:#eef3f7;font:700 15px var(--f-eng);padding:0 12px}
+.kwerk button.an{background:var(--gold);color:#15100a}
+.massstab{position:absolute;left:12px;bottom:14px;font:600 12px var(--f-mono);color:var(--text)}
+.massstab i{display:block;height:5px;border:2px solid var(--text);border-top:0;margin-top:3px}
+
+.leiste{min-width:0;overflow:auto;background:var(--grund2);border-left:1px solid var(--linie);display:flex;flex-direction:column;gap:12px;
+  padding-block:14px 28px;padding-left:max(14px,env(safe-area-inset-left,0px));padding-right:max(14px,env(safe-area-inset-right,0px))}
+@media (min-width:861px){.app{height:100%;min-height:0}.haupt{min-height:0;grid-template-rows:minmax(0,1fr)}.kartenfeld{min-height:0}.leiste{min-height:0}}
+@media (max-width:860px){
+  .haupt{grid-template-columns:1fr;grid-template-rows:auto auto}
+  .kartenfeld{height:46vh;min-height:300px}
+  .leiste{border-left:0;border-top:1px solid var(--linie);overflow:visible;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+}
+
+.tafel{background:var(--karte);border-radius:16px;box-shadow:inset 0 0 0 1px var(--linie);padding:14px}
+.eyebrow{font:600 12px var(--f-mono);color:var(--still);letter-spacing:.02em;display:flex;gap:10px;flex-wrap:wrap}
+h1.kunde{font:700 26px/1.1 var(--f-eng);margin:6px 0 2px;letter-spacing:.01em;text-wrap:balance}
+.unter{color:var(--still);font-size:14px}
+.status{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 12px;border-radius:999px;font:700 14px var(--f-eng);letter-spacing:.06em;text-transform:uppercase;background:var(--karte-hoch)}
+.status i{width:10px;height:10px;border-radius:50%;background:var(--still)}
+.status.laeuft i{background:var(--gruen);box-shadow:0 0 0 4px rgba(52,194,107,.2)}
+.status.pause i{background:var(--gelb)}
+.status.beendet i{background:var(--lead)}
+.tasten{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.taste{min-height:64px;border-radius:14px;border:0;font:700 20px var(--f-eng);letter-spacing:.08em;text-transform:uppercase;background:var(--karte-hoch);box-shadow:inset 0 0 0 1px var(--linie-hell)}
+.taste.haupt{grid-column:1/-1;background:var(--gold);color:var(--auf-gold);box-shadow:none}
+.taste.warn{background:rgba(239,74,62,.16);box-shadow:inset 0 0 0 1.5px var(--rot)}
+.taste:disabled{opacity:.4;cursor:default}
+.taste small{display:block;font:600 12px var(--f-text);letter-spacing:0;text-transform:none;opacity:.8;margin-top:2px}
+
+.jetzt{display:flex;gap:12px;align-items:center}
+.jetzt .ort{font:700 24px/1.1 var(--f-eng);text-wrap:balance}
+.jetzt .was{color:var(--still);font-size:14px;margin-top:2px}
+.jetzt .tempo{margin-left:auto;text-align:right;font:700 30px/1 var(--f-eng);font-variant-numeric:tabular-nums}
+.jetzt .tempo small{display:block;font:600 12px var(--f-text);color:var(--still);margin-top:4px}
+.zeichen{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;flex:none;background:var(--karte-hoch)}
+.zeichen svg{width:24px;height:24px}
+
+.gross{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.gross b{font:700 44px/1 var(--f-eng);font-variant-numeric:tabular-nums;color:var(--gold-hell)}
+.gross span{font:600 18px var(--f-eng);color:var(--still)}
+.gross em{font-style:normal;margin-left:auto;font:700 22px var(--f-eng);font-variant-numeric:tabular-nums}
+.regel{font-size:13px;color:var(--still);margin-top:4px}
+.balken{display:flex;height:14px;border-radius:7px;overflow:hidden;margin-top:12px;background:var(--z-pause)}
+.balken i{display:block;height:100%}
+.legende{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;margin-top:10px;font-size:13.5px;align-items:center}
+.legende .p{width:10px;height:10px;border-radius:3px}
+.legende .w{font:600 13.5px var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.legende .z{color:var(--still)}
+.legende .z.ab{color:var(--text);font-weight:600}
+
+h2{font:700 15px var(--f-eng);letter-spacing:.1em;text-transform:uppercase;color:var(--still);margin:0 0 10px;display:flex;align-items:center;gap:8px}
+h2 span{margin-left:auto;font:600 13px var(--f-mono);letter-spacing:0;text-transform:none}
+.zeilen{display:flex;flex-direction:column}
+.zeile{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--linie)}
+.zeile:first-child{border-top:0}
+.zeile .n{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zeile .n small{display:block;font-weight:400;color:var(--still);font-size:12.5px}
+.zeile .w{font:600 14px var(--f-mono);font-variant-numeric:tabular-nums;text-align:right}
+.zeile button{min-height:44px;min-width:86px;border-radius:12px;border:0;font:700 15px var(--f-eng);letter-spacing:.06em;background:var(--karte-hoch);box-shadow:inset 0 0 0 1px var(--linie-hell)}
+.zeile button.laeuft{background:var(--gold);color:var(--auf-gold);box-shadow:none}
+.leer{color:var(--still);font-size:14px}
+.hinzu{display:flex;gap:8px;margin-top:8px}
+.hinzu input{flex:1;min-width:0}
+
+.feldzeile{grid-template-columns:auto minmax(0,1fr) auto auto}
+.feldzeile .marke2{width:12px;height:12px;border-radius:3px;background:var(--gold-flaeche);box-shadow:inset 0 0 0 2px var(--gold)}
+.feldzeile.jetzt-hier .marke2{background:var(--gold)}
+
+input[type=text],input[type=number],input[type=tel],select,textarea{width:100%;min-height:46px;border-radius:12px;border:0;background:var(--karte-hoch);
+  box-shadow:inset 0 0 0 1px var(--linie-hell);padding:8px 12px;font-size:16px}
+textarea{min-height:90px;font:13px var(--f-mono)}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px}
+.form label{display:flex;flex-direction:column;gap:5px;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--still);font-weight:600;min-width:0}
+.form .voll{grid-column:1/-1}
+@media (max-width:420px){.form{grid-template-columns:1fr}}
+.knopfreihe{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.knopf{min-height:48px;padding:0 16px;border-radius:12px;border:0;background:var(--karte-hoch);box-shadow:inset 0 0 0 1px var(--linie-hell);font:700 15px var(--f-eng);letter-spacing:.05em;text-decoration:none;color:var(--text);display:inline-flex;align-items:center}
+.knopf.haupt{background:var(--gold);color:var(--auf-gold);box-shadow:none}
+.knopf:disabled{opacity:.45;cursor:default}
+details.aufklapp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:44px;font:700 15px var(--f-eng);letter-spacing:.1em;text-transform:uppercase;color:var(--still)}
+details.aufklapp>summary::-webkit-details-marker{display:none}
+details.aufklapp>summary::after{content:"›";margin-left:auto;font-size:22px;transition:transform .15s}
+details.aufklapp[open]>summary::after{transform:rotate(90deg)}
+.abschnitt{border-top:1px solid var(--linie);margin-top:14px;padding-top:12px}
+.abschnitt h3{font:700 14px var(--f-eng);letter-spacing:.08em;text-transform:uppercase;margin:0 0 8px}
+.hinweis{font-size:13px;color:var(--still);margin:8px 0 0}
+.meldung{border-radius:12px;padding:10px 12px;font-size:14px;background:var(--gold-flaeche);box-shadow:inset 0 0 0 1px var(--gold)}
+.meldung.fehler{background:rgba(239,74,62,.14);box-shadow:inset 0 0 0 1px var(--rot)}
+.wahlliste{display:flex;flex-direction:column;gap:6px;margin-top:10px;max-height:260px;overflow:auto}
+.wahlliste label{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 10px;border-radius:10px;background:var(--karte-hoch);font-size:14px}
+.wahlliste input{width:22px;height:22px}
+.wahlliste small{color:var(--still)}
+.wahlliste .w{font:600 13px var(--f-mono)}
+ul.hinweise{margin:0;padding-left:18px;font-size:13.5px;color:var(--still)}
+ul.hinweise li{margin:3px 0}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="app">
+  <header class="kopf">
+    <div class="marke">VYREL <b>·</b> AUFTRAG</div>
+    <span class="rollechip" id="k_rolle"><i id="k_rollefarbe"></i><span id="k_rolletext">–</span></span>
+    <div class="rechts">
+      <span class="uhr" id="k_uhr">--:--</span>
+      <button type="button" class="klein" id="k_licht">Tag</button>
+      <a class="klein" id="k_zurueck" href="/">‹ Anzeige</a>
+    </div>
+  </header>
+  <div class="demoband" id="demoband" hidden>
+    <b>VORFÜHRUNG</b><span>Erfundene Daten, kein Pi verbunden. Rolle:</span>
+    <button type="button" class="klein" data-demo-rolle="haecksler" id="dr_h">Häcksler</button>
+    <button type="button" class="klein" data-demo-rolle="abfahrer" id="dr_a">Abfahrer</button>
+  </div>
+  <div class="weg" id="weg" hidden>Auftragsdienst antwortet nicht. Die Messung läuft weiter; die Seite versucht es jede Sekunde neu.</div>
+
+  <div class="haupt">
+    <div class="kartenfeld" id="kartenfeld">
+      <canvas id="karte" aria-label="Karte mit den Feldern des Auftrags und der eigenen Position"></canvas>
+      <div class="kband"><span class="kchip" id="kc_feld">–</span><span class="kchip" id="kc_gps" hidden></span></div>
+      <div class="massstab" id="massstab"><span id="ms_text">100 m</span><i id="ms_strich" style="width:80px"></i></div>
+      <div class="kwerk">
+        <button type="button" id="kw_folgen" class="an" aria-pressed="true">Folgen</button>
+        <button type="button" id="kw_alle">Felder</button>
+      </div>
+    </div>
+
+    <aside class="leiste" id="leiste">
+      <section class="tafel" aria-labelledby="a_kunde">
+        <div class="eyebrow"><span id="a_id">kein Auftrag</span><span id="a_datum"></span></div>
+        <h1 class="kunde" id="a_kunde">Noch kein Auftrag</h1>
+        <div class="unter" id="a_unter">Felder aus der Feldkarte einlesen: unten unter „Auftrag bearbeiten".</div>
+        <div class="status" id="a_status"><i></i><span id="a_statustext">nicht gestartet</span></div>
+      </section>
+
+      <section class="tasten" id="tasten" aria-label="Auftrag steuern"></section>
+      <div class="meldung" id="meldung" hidden></div>
+
+      <section class="tafel" aria-label="Wo die Maschine gerade ist">
+        <div class="jetzt">
+          <div class="zeichen" id="j_zeichen"></div>
+          <div style="min-width:0"><div class="ort" id="j_ort">–</div><div class="was" id="j_was">–</div></div>
+          <div class="tempo" id="j_tempo">–<small>km/h</small></div>
+        </div>
+      </section>
+
+      <section class="tafel" aria-labelledby="h_std">
+        <h2 id="h_std">Stunden heute <span id="s_zeitraum"></span></h2>
+        <div class="gross"><b id="s_h">0,0</b><span>h</span><em id="s_eur"></em></div>
+        <div class="regel" id="s_regel">–</div>
+        <div class="balken" id="s_balken" role="img" aria-label="Aufteilung der Zeit"></div>
+        <div class="legende" id="s_legende"></div>
+      </section>
+
+      <section class="tafel" id="t_hand" hidden aria-labelledby="h_hand">
+        <h2 id="h_hand">Abfahrer ohne Pi <span id="hand_summe"></span></h2>
+        <div class="zeilen" id="hand_liste"></div>
+        <div class="hinzu"><input type="text" id="hand_name" placeholder="z. B. Fendt 724 Sepp" maxlength="40" aria-label="Name des Abfahrers"><button type="button" class="knopf" id="hand_neu">Dazu</button></div>
+        <p class="hinweis">Start beim Losfahren am Hof, Stopp beim Abstellen. Pausen des Auftrags werden abgezogen.</p>
+      </section>
+
+      <section class="tafel" id="t_kette" hidden aria-labelledby="h_kette">
+        <h2 id="h_kette">Kette <span id="kette_dran"></span></h2>
+        <div class="zeilen" id="kette_liste"></div>
+      </section>
+
+      <section class="tafel" id="t_felder" hidden aria-labelledby="h_felder">
+        <h2 id="h_felder">Felder <span id="felder_summe"></span></h2>
+        <div class="zeilen" id="felder_liste"></div>
+      </section>
+
+      <section class="tafel" id="t_hinweise" hidden aria-labelledby="h_hinweise">
+        <h2 id="h_hinweise">Hinweise</h2>
+        <ul class="hinweise" id="hinweise"></ul>
+      </section>
+
+      <details class="tafel aufklapp" id="bearbeiten">
+        <summary>Auftrag bearbeiten</summary>
+        <div id="bearbeiten_inhalt"></div>
+      </details>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+/* ================================================================ Grundlagen */
+var $=function(id){return document.getElementById(id)};
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function de(v,n,e){if(v==null||!isFinite(v))return "–";var t=Number(v).toLocaleString("de-DE",{minimumFractionDigits:n||0,maximumFractionDigits:n||0});return e?t+" "+e:t}
+function pad(n){return (n<10?"0":"")+n}
+function uhr(t){if(!t)return "–";var d=new Date(t*1000);return pad(d.getHours())+":"+pad(d.getMinutes())}
+function hm(s){if(s==null)return "–";var m=Math.round(s/60);return Math.floor(m/60)+":"+pad(m%60)}
+function speicher(k,v){try{if(v===undefined)return window.localStorage.getItem(k);window.localStorage.setItem(k,v)}catch(e){return null}}
+
+var ZUSTAND=[
+  ["feld_fahrt","im Feld, fährt","--z-feldfahrt"],["feld_stand","im Feld, steht","--z-feldstand"],
+  ["strasse","Straße","--z-strasse"],["silo","am Silo","--z-silo"],["stand","steht außerhalb","--z-stand"],
+  ["ohne_position","ohne Position","--z-ohne"],["pause","Pause","--z-pause"]];
+var ART={feld:"nach Zeit im Feld",einsatz:"nach Einsatzzeit"};
+var SYM={
+  feld:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 18l4-12h10l4 12z"/><path d="M8 18l2-12M16 18l-2-12M5 12h14"/></svg>',
+  strasse:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M7 21L10 3M17 21L14 3M12 6v2M12 12v2M12 18v2"/></svg>',
+  silo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 19l4-9h10l4 9z"/><path d="M3 19h18M9 10l1-4h4l1 4"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>',
+  aus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>'};
+
+/* Vorführung, wenn nicht auf einem Pi. */
+var h=location.hostname||"";
+var DEMO=/[?&]demo\b/.test(location.search)||location.protocol==="file:"||!(h==="localhost"||h==="127.0.0.1"||/^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(h));
+
+var S=null,WEG=0,UI={folgen:true,ansicht:null,ende:false,vorschau:null,meldung:null,meldungFehler:false};
+
+/* ================================================================ Licht */
+function licht(m,merken){document.documentElement.setAttribute("data-theme",m==="tag"?"light":"dark");$("k_licht").textContent=m==="tag"?"Nacht":"Tag";
+  if(merken)speicher("vyrel_licht",m+"|"+new Date().toDateString());zeichnen()}
+(function(){var w=speicher("vyrel_licht");if(w){var t=w.split("|");if(t[1]===new Date().toDateString())licht(t[0],false)}
+  else{$("k_licht").textContent=(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches)?"Nacht":"Tag"}})();
+$("k_licht").onclick=function(){var jetzt=document.documentElement.getAttribute("data-theme");
+  var hell=jetzt?jetzt==="light":(window.matchMedia&&matchMedia("(prefers-color-scheme: light)").matches);licht(hell?"nacht":"tag",true)};
+function farbe(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()||"#888"}
+
+/* ================================================================ Verbindung */
+function holen(){
+  if(DEMO){S=DEMOSIM.stand();WEG=0;darstellen();return}
+  var x=new XMLHttpRequest();x.open("GET","/auftrag/stand",true);x.timeout=4000;
+  x.onload=function(){if(x.status===200){try{S=JSON.parse(x.responseText);WEG=0;darstellen();return}catch(e){}}WEG++;wegZeigen()};
+  x.onerror=x.ontimeout=function(){WEG++;wegZeigen()};x.send();
+}
+function senden(pfad,daten,fertig){
+  if(DEMO){var a=DEMOSIM.post(pfad,daten);S=a.stand||S;if(fertig)fertig(a.fehler?null:a,a.fehler);darstellen();return}
+  var x=new XMLHttpRequest();x.open("POST",pfad,true);x.timeout=15000;x.setRequestHeader("Content-Type","application/json");
+  x.onload=function(){var a=null;try{a=JSON.parse(x.responseText)}catch(e){}
+    if(x.status===200&&a){if(a.stand)S=a.stand;if(fertig)fertig(a,null);darstellen()}
+    else if(fertig)fertig(null,(a&&a.fehler)||("Fehler "+x.status))};
+  x.onerror=x.ontimeout=function(){if(fertig)fertig(null,"Keine Verbindung zum Pi. Noch einmal versuchen.")};
+  x.send(JSON.stringify(daten||{}));
+}
+function wegZeigen(){$("weg").hidden=WEG<3}
+function melden(t,fehler){UI.meldung=t;UI.meldungFehler=!!fehler;var m=$("meldung");m.hidden=!t;m.textContent=t||"";m.className="meldung"+(fehler?" fehler":"");
+  if(t&&!fehler){clearTimeout(melden.z);melden.z=setTimeout(function(){melden(null)},6000)}}
+function aktion(name,mehr){var d=mehr||{};d.aktion=name;senden("/auftrag/aktion",d,function(a,f){if(f)melden(f,true);else if(a&&a.text)melden(a.text)})}
+
+/* ================================================================ Darstellen */
+function darstellen(){
+  if(!S)return;
+  $("weg").hidden=true;
+  var haeck=S.rolle==="haecksler";
+  $("k_rolletext").textContent=(haeck?"Häcksler":"Abfahrer")+(S.knoten&&S.knoten.name?" · "+S.knoten.name:"");
+  $("k_rollefarbe").style.background=haeck?"var(--lead)":"var(--gespann)";
+  $("k_zurueck").hidden=DEMO;$("demoband").hidden=!DEMO;
+  if(DEMO){$("dr_h").className="klein"+(haeck?" an":"");$("dr_a").className="klein"+(haeck?"":" an")}
+  var a=S.auftrag,st=S.status||"offen";
+  if(a){
+    $("a_id").textContent=a.id||"";$("a_datum").textContent=a.datum?a.datum.split("-").reverse().join("."):"";
+    $("a_kunde").textContent=(a.kunde&&a.kunde.name)||"Kunde fehlt";
+    var ha=(a.felder||[]).reduce(function(s,f){return s+(f.ha||0)},0);
+    $("a_unter").textContent=[a.name||"",a.arbeitsgang||"",(a.felder||[]).length+" Felder · "+de(ha,2)+" ha"].filter(Boolean).join(" · ");
+  }else{$("a_id").textContent="kein Auftrag";$("a_datum").textContent="";$("a_kunde").textContent="Noch kein Auftrag";
+    $("a_unter").textContent="Felder aus der Feldkarte einlesen: unten unter „Auftrag bearbeiten“."}
+  var stt={offen:"nicht gestartet",laeuft:"läuft seit "+uhr(S.status_seit),pause:"Pause seit "+uhr(S.status_seit),beendet:"beendet um "+uhr(S.status_seit)}[st]||st;
+  $("a_status").className="status "+st;$("a_statustext").textContent=stt;
+  tastenBauen(a,st);
+  jetztBauen();
+  stundenBauen();
+  handBauen(haeck);
+  ketteBauen(haeck);
+  felderBauen();
+  var hw=(S.hinweise||[]);$("t_hinweise").hidden=!hw.length;$("hinweise").innerHTML=hw.map(function(x){return "<li>"+esc(x)+"</li>"}).join("");
+  if(!$("bearbeiten").open||!$("bearbeiten_inhalt").firstChild)bearbeitenBauen();
+  zeichnen();
+}
+var tastenSchluessel="";
+function tastenBauen(a,st){
+  var k=[!!a,st,UI.ende].join("|");if(k===tastenSchluessel)return;tastenSchluessel=k;
+  var t=[];
+  if(!a)t.push('<button type="button" class="taste haupt" disabled>Start<small>erst Felder einlesen</small></button>');
+  else if(st==="offen"||st==="beendet")t.push('<button type="button" class="taste haupt" data-akt="start">'+(st==="beendet"?"Wieder starten":"Start")+'<small>Stunden zählen ab jetzt</small></button>');
+  else if(UI.ende)t.push('<button type="button" class="taste warn" data-akt="ende_ja">Ja, beenden</button><button type="button" class="taste" data-akt="ende_nein">Abbrechen</button>');
+  else if(st==="laeuft")t.push('<button type="button" class="taste" data-akt="pause">Pause</button><button type="button" class="taste" data-akt="ende">Ende</button>');
+  else if(st==="pause")t.push('<button type="button" class="taste haupt" data-akt="weiter">Weiter<small>Pause beenden</small></button><button type="button" class="taste" data-akt="ende" style="grid-column:1/-1">Ende</button>');
+  $("tasten").innerHTML=t.join("");
+}
+$("tasten").addEventListener("click",function(e){var b=e.target.closest("[data-akt]");if(!b)return;var w=b.getAttribute("data-akt");
+  if(w==="ende"){UI.ende=true;tastenSchluessel="";darstellen();return}
+  if(w==="ende_nein"){UI.ende=false;tastenSchluessel="";darstellen();return}
+  if(w==="ende_ja"){UI.ende=false;tastenSchluessel="";aktion("ende");return}
+  aktion(w)});
+
+function jetztBauen(){
+  var p=S.position,z=p&&p.zustand,ort="Keine Position",was="",sym="aus";
+  if(p){
+    if(z==="feld_fahrt"||z==="feld_stand"){ort=p.feld_name||"im Feld";was=z==="feld_fahrt"?"im Feld, fährt":"im Feld, steht";sym="feld"}
+    else if(z==="silo"){ort="Am Silo";was="Abladestelle";sym="silo"}
+    else if(z==="strasse"){ort="Unterwegs";was="außerhalb der Felder, fährt";sym="strasse"}
+    else if(z==="stand"){ort="Steht";was="außerhalb der Felder";sym="aus"}
+    else if(z==="pause"){ort=p.feld_name||"Pause";was="Pause — zählt nicht";sym="pause"}
+    else if(z==="ausserhalb"){ort=p.feld_name||(S.auftrag?"Auftrag läuft nicht":"Kein Auftrag");was="Zeit zählt erst nach Start";sym="aus"}
+    else if(z==="ohne_position"){ort="Keine Position";was="Empfänger ohne Lösung";sym="aus"}
+    if(p.alter_s>10){was="Position "+Math.round(p.alter_s)+" s alt";}
+  }
+  $("j_ort").textContent=ort;$("j_was").textContent=was;$("j_zeichen").innerHTML=SYM[sym];
+  $("j_zeichen").style.color=sym==="feld"?"var(--gold)":sym==="silo"?"var(--z-silo)":sym==="strasse"?"var(--mess)":"var(--still)";
+  $("j_tempo").innerHTML=(p&&p.kmh!=null&&p.alter_s<=10?de(p.kmh,1):"–")+"<small>km/h</small>";
+  $("kc_feld").textContent=ort;
+  var g=$("kc_gps");if(p&&p.alter_s>10){g.hidden=false;g.textContent="GPS "+Math.round(p.alter_s)+" s alt"}else g.hidden=true;
+}
+function stundenBauen(){
+  var z=S.zeiten||{},zs=z.zustaende_s||{};
+  $("s_h").textContent=de(z.stunden,1);
+  $("s_eur").textContent=z.betrag!=null?de(z.betrag,2,"€"):"";
+  var r=S.auftrag&&S.auftrag.abrechnung?S.auftrag.abrechnung.runden_h:null;
+  $("s_regel").textContent=(ART[z.art]||"")+(z.satz!=null?" · "+de(z.satz,2,"€/h"):" · kein Stundensatz")+(r?" · gerundet auf "+de(r,r<0.1?2:1)+" h":"")+" · genau "+hm(z.abrechnung_s)+" h";
+  $("s_zeitraum").textContent=z.erste?uhr(z.erste)+"–"+uhr(z.letzte):"";
+  var summe=0;ZUSTAND.forEach(function(x){summe+=zs[x[0]]||0});
+  $("s_balken").innerHTML=summe?ZUSTAND.map(function(x){var w=(zs[x[0]]||0)/summe*100;return w>0?'<i style="width:'+w.toFixed(2)+'%;background:var('+x[2]+')"></i>':""}).join(""):"";
+  var ab=z.art==="feld"?["feld_fahrt","feld_stand"]:["feld_fahrt","feld_stand","strasse","silo","stand","ohne_position"];
+  $("s_legende").innerHTML=ZUSTAND.filter(function(x){return zs[x[0]]}).map(function(x){
+    return '<i class="p" style="background:var('+x[2]+')"></i><span class="z'+(ab.indexOf(x[0])>=0?" ab":"")+'">'+x[1]+(ab.indexOf(x[0])>=0?"":" · zählt nicht")+'</span><span class="w">'+hm(zs[x[0]])+'</span>'}).join("")
+    ||'<span></span><span class="z">Noch keine Zeit gezählt.</span><span></span>';
+}
+function handBauen(haeck){
+  $("t_hand").hidden=!haeck||!S.auftrag;if($("t_hand").hidden)return;
+  var l=S.hand||[],s=0,e=0,ee=false;
+  $("hand_liste").innerHTML=l.length?l.map(function(x){s+=x.stunden||0;if(x.betrag!=null){e+=x.betrag;ee=true}
+    return '<div class="zeile"><span class="n">'+esc(x.name)+'<small>'+(x.laeuft?"läuft seit "+uhr(x.seit):"steht")+' · '+de(x.stunden,1)+' h'+(x.betrag!=null?" · "+de(x.betrag,2,"€"):"")+'</small></span>'+
+      '<span class="w">'+hm(x.abrechnung_s)+'</span><button type="button" class="'+(x.laeuft?"laeuft":"")+'" data-hand="'+esc(x.id)+'" data-laeuft="'+(x.laeuft?1:0)+'">'+(x.laeuft?"Stopp":"Start")+'</button></div>'}).join("")
+    :'<p class="leer">Noch keiner. Abfahrer ohne eigenen Pi hier eintragen.</p>';
+  $("hand_summe").textContent=l.length?de(s,1)+" h"+(ee?" · "+de(e,2,"€"):""):"";
+}
+$("hand_liste").addEventListener("click",function(e){var b=e.target.closest("[data-hand]");if(!b)return;aktion(b.getAttribute("data-laeuft")==="1"?"hand_ende":"hand_start",{id:b.getAttribute("data-hand")})});
+$("hand_neu").onclick=function(){var n=$("hand_name").value.trim();if(!n){melden("Erst einen Namen eintragen.",true);return}aktion("hand_neu",{name:n});$("hand_name").value=""};
+function ketteBauen(haeck){
+  var k=S.kette;$("t_kette").hidden=!haeck||!k;if($("t_kette").hidden)return;
+  $("kette_dran").textContent=k.dran_name?"dran: "+k.dran_name:"niemand dran";
+  var l=k.ladungen||[];
+  $("kette_liste").innerHTML=l.length?l.map(function(x){return '<div class="zeile"><span class="n">'+esc(x.name||x.kennung)+'<small>Ø '+hm(x.mittel_s).replace(/^0:/,"")+' min je Ladung</small></span><span class="w">'+x.anzahl+' Ladungen</span><span></span></div>'}).join("")
+    :'<p class="leer">Noch keine Ladung von einem Abfahrer mit Pi.</p>';
+}
+function felderBauen(){
+  var f=(S.auftrag&&S.auftrag.felder)||[];$("t_felder").hidden=!f.length;if(!f.length)return;
+  var fs=(S.zeiten&&S.zeiten.felder_s)||{},jetzt=S.position&&S.position.feld_id,ha=0;
+  $("felder_liste").innerHTML=f.map(function(x){ha+=x.ha||0;var s=fs[x.id]||0;
+    return '<div class="zeile feldzeile'+(x.id===jetzt?" jetzt-hier":"")+'"><i class="marke2"></i><span class="n">'+esc(x.name)+'<small>'+(x.id===jetzt?"hier":s?hm(s)+" h im Feld":"noch nicht befahren")+'</small></span><span class="w">'+de(x.ha,2)+' ha</span><span class="w">'+(s>600?de(x.ha/(s/3600),1)+" ha/h":"")+'</span></div>'}).join("");
+  $("felder_summe").textContent=de(ha,2)+" ha";
+}
+
+/* ================================================================ Bearbeiten */
+function bearbeitenBauen(){
+  var a=S&&S.auftrag,k=(a&&a.kunde)||{},sa=(a&&a.saetze)||{},ab=(a&&a.abrechnung)||{},v=UI.vorschau;
+  var t='';
+  if(a){
+    t+='<form class="form" id="f_daten" autocomplete="off">'+
+      '<label class="voll">Kunde<input type="text" id="f_kunde" value="'+esc(k.name)+'" placeholder="z. B. Bioenergie Linder GbR"></label>'+
+      '<label class="voll">Anschrift<input type="text" id="f_anschrift" value="'+esc(k.anschrift)+'"></label>'+
+      '<label>Ansprechpartner<input type="text" id="f_ansprech" value="'+esc(k.ansprechpartner)+'"></label>'+
+      '<label>Telefon<input type="tel" id="f_tel" value="'+esc(k.telefon)+'"></label>'+
+      '<label>Auftrag<input type="text" id="f_name" value="'+esc(a.name)+'" placeholder="z. B. Gras 4. Schnitt"></label>'+
+      '<label>Arbeitsgang<select id="f_gang">'+["Häckseln","Ladewagen","Mähen","Schwaden","Wenden"].map(function(g){return '<option'+(a.arbeitsgang===g?" selected":"")+'>'+g+'</option>'}).join("")+'</select></label>'+
+      '<label>Häcksler €/h<input type="text" inputmode="decimal" id="f_sh" value="'+(sa.haecksler_eur_h!=null?de(sa.haecksler_eur_h,2):"")+'" placeholder="ohne Diesel"></label>'+
+      '<label>Abfahrer €/h<input type="text" inputmode="decimal" id="f_sa" value="'+(sa.abfahrer_eur_h!=null?de(sa.abfahrer_eur_h,2):"")+'" placeholder="je Gespann"></label>'+
+      '<label>Häcksler zählt<select id="f_ah"><option value="feld"'+(ab.haecksler==="feld"?" selected":"")+'>Zeit im Feld</option><option value="einsatz"'+(ab.haecksler==="einsatz"?" selected":"")+'>Einsatzzeit</option></select></label>'+
+      '<label>Abfahrer zählt<select id="f_aa"><option value="einsatz"'+(ab.abfahrer!=="feld"?" selected":"")+'>Einsatzzeit</option><option value="feld"'+(ab.abfahrer==="feld"?" selected":"")+'>Zeit im Feld</option></select></label>'+
+      '<label>Runden auf<select id="f_rd">'+[[0.1,"0,1 h (6 min)"],[0.25,"0,25 h (15 min)"],[0.5,"0,5 h"],[0,"nicht runden"]].map(function(o){return '<option value="'+o[0]+'"'+(Number(ab.runden_h)===o[0]?" selected":"")+'>'+o[1]+'</option>'}).join("")+'</select></label>'+
+      '<label class="voll">Notiz<input type="text" id="f_notiz" value="'+esc(a.notiz)+'"></label>'+
+      '</form><div class="knopfreihe"><button type="button" class="knopf haupt" id="f_speichern">Speichern</button></div>'+
+      '<div class="abschnitt"><h3>Silo / Abladestelle</h3><p class="hinweis" style="margin-top:0">'+(a.silo?"Gesetzt. Im Umkreis von 60 m zählt die Zeit als „am Silo“.":"Noch nicht gesetzt. Am Silo stehend antippen; die Position kommt vom Empfänger.")+'</p>'+
+      '<div class="knopfreihe"><button type="button" class="knopf" id="f_silo">Silo hier setzen</button>'+(a.silo?'<button type="button" class="knopf" id="f_silo_weg">Silo entfernen</button>':"")+'</div></div>'+
+      '<div class="abschnitt"><h3>Stundenzettel</h3><p class="hinweis" style="margin-top:0">Alle Stunden dieses Pi von heute, mit Zeitleiste — zum Ansehen und Abschreiben.</p><div class="knopfreihe">'+
+      (DEMO?'<button type="button" class="knopf" disabled>Nur am Pi</button>':'<a class="knopf" href="/auftrag/stundenzettel" target="_blank">Stundenzettel öffnen</a>')+'</div></div>';
+  }
+  t+='<div class="abschnitt"><h3>'+(a?"Neue Felder einlesen":"Felder einlesen")+'</h3>'+
+    '<p class="hinweis" style="margin-top:0">Datei aus der Feldkarte (VYREL-Auftrag, Feldschlagkarte, GeoJSON oder KML) wählen, oder den Text hineinkopieren.</p>'+
+    '<div class="knopfreihe"><label class="knopf" for="f_datei" style="cursor:pointer">Datei wählen</label><input type="file" id="f_datei" accept=".json,.geojson,.kml,.txt,application/json" hidden>'+
+    (DEMO?'<button type="button" class="knopf" id="f_beispiel">Beispieldatei</button>':"")+'</div>'+
+    '<textarea id="f_text" placeholder="… oder hier einfügen" style="margin-top:10px"></textarea>'+
+    '<div class="knopfreihe"><button type="button" class="knopf" id="f_pruefen">Prüfen</button></div>';
+  if(v){
+    var kunden=v.kunden||[];
+    t+='<div class="meldung" style="margin-top:12px">'+v.felder.length+' Felder gefunden'+(v.hinweise&&v.hinweise.length?": "+esc(v.hinweise.join("; ")):".")+'</div>'+
+      (kunden.length>1?'<div class="knopfreihe">'+kunden.map(function(n){return '<button type="button" class="knopf" data-nur="'+esc(n)+'">nur '+esc(n||"ohne Kunde")+'</button>'}).join("")+'<button type="button" class="knopf" data-nur="*">alle</button></div>':"")+
+      '<div class="wahlliste" id="v_liste">'+v.felder.map(function(f){return '<label><input type="checkbox" data-feld="'+esc(f.id)+'" checked><span>'+esc(f.name)+(f.kunde?' <small>· '+esc(f.kunde)+'</small>':"")+'</span><span class="w">'+de(f.ha,2)+' ha</span></label>'}).join("")+'</div>'+
+      '<div class="form" style="margin-top:12px"><label class="voll">Kunde<input type="text" id="v_kunde" value="'+esc(v.kunde||kunden[0]||(k.name||""))+'"></label>'+
+      '<label class="voll">Auftrag<input type="text" id="v_name" value="'+esc(v.name||"")+'" placeholder="z. B. Gras 4. Schnitt"></label></div>'+
+      '<p class="hinweis">'+(a&&(S.status==="laeuft"||S.status==="pause")?"Der laufende Auftrag wird dabei beendet; seine Stunden bleiben erhalten.":"Danach Start drücken, dann zählen die Stunden.")+'</p>'+
+      '<div class="knopfreihe"><button type="button" class="knopf haupt" id="v_ok">Als Auftrag übernehmen</button><button type="button" class="knopf" id="v_weg">Verwerfen</button></div>';
+  }
+  t+='</div>';
+  $("bearbeiten_inhalt").innerHTML=t;
+}
+function zahlLesen(s){s=String(s||"").trim().replace(/\s/g,"");if(!s)return null;if(s.indexOf(",")>=0)s=s.replace(/\./g,"").replace(",",".");var n=Number(s);return isFinite(n)?n:NaN}
+$("bearbeiten_inhalt").addEventListener("click",function(e){
+  var b=e.target.closest("button");if(!b)return;var id=b.id;
+  if(id==="f_speichern"){var sh=zahlLesen($("f_sh").value),sa=zahlLesen($("f_sa").value);
+    if(isNaN(sh)||isNaN(sa)){melden("Stundensatz nicht lesbar. Nur Zahlen, etwa 185,00.",true);return}
+    senden("/auftrag/daten",{name:$("f_name").value,arbeitsgang:$("f_gang").value,notiz:$("f_notiz").value,
+      kunde:{name:$("f_kunde").value,anschrift:$("f_anschrift").value,ansprechpartner:$("f_ansprech").value,telefon:$("f_tel").value},
+      saetze:{haecksler_eur_h:sh,abfahrer_eur_h:sa},abrechnung:{haecksler:$("f_ah").value,abfahrer:$("f_aa").value,runden_h:Number($("f_rd").value)}},
+      function(a,f){if(f)melden(f,true);else{melden("Gespeichert.");bearbeitenBauen()}});return}
+  if(id==="f_silo"){aktion("silo");setTimeout(bearbeitenBauen,300);return}
+  if(id==="f_silo_weg"){aktion("silo_weg");setTimeout(bearbeitenBauen,300);return}
+  if(id==="f_pruefen"){pruefen($("f_text").value,"eingefügt");return}
+  if(id==="f_beispiel"){pruefen(JSON.stringify(DEMOSIM.beispieldatei()),"beispiel.json");return}
+  if(id==="v_weg"){UI.vorschau=null;bearbeitenBauen();return}
+  if(b.hasAttribute("data-nur")){var n=b.getAttribute("data-nur");
+    UI.vorschau.felder.forEach(function(f){var c=document.querySelector('[data-feld="'+CSS.escape(f.id)+'"]');if(c)c.checked=n==="*"||f.kunde===n});
+    if(n!=="*")$("v_kunde").value=n;return}
+  if(id==="v_ok"){var ids=[];document.querySelectorAll("#v_liste [data-feld]").forEach(function(c){if(c.checked)ids.push(c.getAttribute("data-feld"))});
+    if(!ids.length){melden("Mindestens ein Feld anhaken.",true);return}
+    senden("/auftrag/uebernehmen",{marke:UI.vorschau.marke,felder:ids,kunde:$("v_kunde").value,name:$("v_name").value},
+      function(a,f){if(f){melden(f,true);return}UI.vorschau=null;melden(a.text||"Auftrag übernommen.");bearbeitenBauen();UI.ansicht=null;zeichnen()});return}
+});
+$("bearbeiten_inhalt").addEventListener("change",function(e){
+  if(e.target.id!=="f_datei"||!e.target.files||!e.target.files[0])return;var d=e.target.files[0];
+  if(d.size>3e6){melden("Die Datei ist größer als 3 MB — das ist keine Feldkarte.",true);return}
+  var r=new FileReader();r.onload=function(){pruefen(String(r.result),d.name)};r.onerror=function(){melden("Datei nicht lesbar.",true)};r.readAsText(d);
+});
+function pruefen(text,name){if(!String(text||"").trim()){melden("Erst eine Datei wählen oder Text einfügen.",true);return}
+  senden("/auftrag/einlesen",{text:text,dateiname:name},function(a,f){if(f){melden(f,true);return}UI.vorschau=a.vorschau;bearbeitenBauen();melden(null)})}
+$("bearbeiten").addEventListener("toggle",function(){if($("bearbeiten").open)bearbeitenBauen()});
+
+/* ================================================================ Karte */
+var cv=$("karte"),cx=cv.getContext("2d");
+function kartenKasten(){
+  var pts=[];((S&&S.auftrag&&S.auftrag.felder)||[]).forEach(function(f){(f.grenze[0]||[]).forEach(function(p){pts.push(p)})});
+  if(S&&S.auftrag&&S.auftrag.silo)pts.push([S.auftrag.silo.lat,S.auftrag.silo.lon]);
+  if(S&&S.position&&S.position.lat!=null)pts.push([S.position.lat,S.position.lon]);
+  return pts;
+}
+function zeichnen(){
+  var r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;if(!r.width)return;
+  if(cv.width!==Math.round(r.width*dpr)||cv.height!==Math.round(r.height*dpr)){cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr)}
+  cx.setTransform(dpr,0,0,dpr,0,0);var W=r.width,H=r.height;
+  cx.fillStyle=farbe("--feldgrund");cx.fillRect(0,0,W,H);
+  if(!S)return;
+  var p=S.position,pts=kartenKasten();
+  // Ansicht: Mitte (lat, lon) und Meter je Pixel
+  var lat0,lon0,mpp;
+  var alle=function(){if(!pts.length)return null;var a=1e9,b=-1e9,c=1e9,d=-1e9;pts.forEach(function(q){a=Math.min(a,q[0]);b=Math.max(b,q[0]);c=Math.min(c,q[1]);d=Math.max(d,q[1])});
+    var la=(a+b)/2,mx=111320*Math.cos(la*Math.PI/180),hm_=(b-a)*111132,wm=(d-c)*mx;return {lat:la,lon:(c+d)/2,mpp:Math.max(1.2,Math.max(wm/(W-60),hm_/(H-110))*1.08)}};
+  if(UI.folgen&&p&&p.lat!=null){var g=UI.ansicht||alle();lat0=p.lat;lon0=p.lon;mpp=g?Math.min(g.mpp,3.5):2.5}
+  else{var v=UI.ansicht||alle();if(!v){cx.fillStyle=farbe("--still");cx.font="600 15px "+farbe("--f-text");cx.textAlign="center";cx.fillText(S.auftrag?"Noch keine Position":"Noch keine Felder — Auftrag einlesen",W/2,H/2);return}lat0=v.lat;lon0=v.lon;mpp=v.mpp}
+  UI.letzte={lat:lat0,lon:lon0,mpp:mpp};
+  var mx=111320*Math.cos(lat0*Math.PI/180),my=111132;
+  function xy(q){return [W/2+(q[1]-lon0)*mx/mpp,H/2-(q[0]-lat0)*my/mpp]}
+  // Raster 50 m
+  var schritt=mpp<1.5?25:mpp<4?50:mpp<10?100:250,px=schritt/mpp;cx.strokeStyle=farbe("--raster");cx.lineWidth=1;cx.beginPath();
+  for(var x=((W/2)%px);x<W;x+=px){cx.moveTo(x,0);cx.lineTo(x,H)}for(var y=((H/2)%px);y<H;y+=px){cx.moveTo(0,y);cx.lineTo(W,y)}cx.stroke();
+  // Felder
+  var jetzt=p&&p.feld_id,gold=farbe("--gold");
+  ((S.auftrag&&S.auftrag.felder)||[]).forEach(function(f){
+    cx.beginPath();f.grenze.forEach(function(ring){ring.forEach(function(q,i){var a=xy(q);if(i)cx.lineTo(a[0],a[1]);else cx.moveTo(a[0],a[1])});cx.closePath()});
+    cx.globalAlpha=f.id===jetzt?.30:.14;cx.fillStyle=gold;cx.fill("evenodd");cx.globalAlpha=1;
+    cx.lineWidth=f.id===jetzt?3:1.8;cx.strokeStyle=gold;cx.stroke();
+    var s=f.grenze[0].reduce(function(m,q){return [m[0]+q[0]/f.grenze[0].length,m[1]+q[1]/f.grenze[0].length]},[0,0]),c=xy(s);
+    cx.textAlign="center";cx.font="700 14px "+farbe("--f-eng");cx.fillStyle=farbe("--text");cx.fillText(f.name,c[0],c[1]-2);
+    cx.font="600 12px "+farbe("--f-mono");cx.fillStyle=farbe("--still");cx.fillText(de(f.ha,2)+" ha",c[0],c[1]+14);
+  });
+  // Silo
+  var si=S.auftrag&&S.auftrag.silo;if(si){var c2=xy([si.lat,si.lon]);cx.beginPath();cx.arc(c2[0],c2[1],60/mpp,0,7);cx.fillStyle=farbe("--z-silo");cx.globalAlpha=.16;cx.fill();cx.globalAlpha=1;
+    cx.lineWidth=1.5;cx.strokeStyle=farbe("--z-silo");cx.stroke();cx.font="700 13px "+farbe("--f-eng");cx.fillStyle=farbe("--text");cx.textAlign="center";cx.fillText("SILO",c2[0],c2[1]+5)}
+  // Spur
+  var sp=S.spur||[];if(sp.length>1){cx.beginPath();sp.forEach(function(q,i){var a=xy(q);if(i)cx.lineTo(a[0],a[1]);else cx.moveTo(a[0],a[1])});
+    cx.strokeStyle=farbe(S.rolle==="haecksler"?"--lead":"--gespann");cx.globalAlpha=.55;cx.lineWidth=2;cx.stroke();cx.globalAlpha=1}
+  // Eigene Position
+  if(p&&p.lat!=null){var a=xy([p.lat,p.lon]),rf=farbe(S.rolle==="haecksler"?"--lead":"--gespann");cx.save();cx.translate(a[0],a[1]);
+    cx.beginPath();cx.arc(0,0,20,0,7);cx.fillStyle=rf;cx.globalAlpha=.22;cx.fill();cx.globalAlpha=p.alter_s>10?.4:1;
+    if(p.kurs!=null){cx.rotate(p.kurs*Math.PI/180);cx.beginPath();cx.moveTo(0,-15);cx.lineTo(10,11);cx.lineTo(0,5);cx.lineTo(-10,11);cx.closePath()}else{cx.beginPath();cx.arc(0,0,9,0,7)}
+    cx.fillStyle=rf;cx.fill();cx.lineWidth=2.5;cx.strokeStyle=farbe("--grund");cx.stroke();cx.restore()}
+  // Maßstab
+  var ziel=[10,20,25,50,100,200,250,500,1000].filter(function(m){return m/mpp<=130}).pop()||10;
+  $("ms_text").textContent=ziel>=1000?de(ziel/1000,0,"km"):ziel+" m";$("ms_strich").style.width=Math.round(ziel/mpp)+"px";
+}
+$("kw_folgen").onclick=function(){UI.folgen=!UI.folgen;this.className=UI.folgen?"an":"";this.setAttribute("aria-pressed",UI.folgen);if(UI.folgen)UI.ansicht=null;zeichnen()};
+$("kw_alle").onclick=function(){UI.folgen=false;UI.ansicht=null;$("kw_folgen").className="";$("kw_folgen").setAttribute("aria-pressed","false");zeichnen()};
+// Ziehen und Zoomen mit Fingern
+(function(){var zeiger={},start=null;
+  function los(){var l=UI.letzte;if(!l)return null;UI.folgen=false;$("kw_folgen").className="";return {lat:l.lat,lon:l.lon,mpp:l.mpp}}
+  cv.addEventListener("pointerdown",function(e){cv.setPointerCapture(e.pointerId);zeiger[e.pointerId]=[e.clientX,e.clientY];start={v:los(),z:JSON.parse(JSON.stringify(zeiger))}});
+  cv.addEventListener("pointermove",function(e){if(!zeiger[e.pointerId]||!start||!start.v)return;zeiger[e.pointerId]=[e.clientX,e.clientY];
+    var ids=Object.keys(zeiger),v=start.v,mx=111320*Math.cos(v.lat*Math.PI/180);
+    if(ids.length===1){var a=start.z[ids[0]]||zeiger[ids[0]],dx=e.clientX-a[0],dy=e.clientY-a[1];UI.ansicht={lat:v.lat+dy*v.mpp/111132,lon:v.lon-dx*v.mpp/mx,mpp:v.mpp}}
+    else if(ids.length>=2&&start.z[ids[0]]&&start.z[ids[1]]){var d0=Math.hypot(start.z[ids[0]][0]-start.z[ids[1]][0],start.z[ids[0]][1]-start.z[ids[1]][1]),d1=Math.hypot(zeiger[ids[0]][0]-zeiger[ids[1]][0],zeiger[ids[0]][1]-zeiger[ids[1]][1]);
+      UI.ansicht={lat:v.lat,lon:v.lon,mpp:Math.max(.3,Math.min(40,v.mpp*d0/Math.max(20,d1)))}}
+    zeichnen()});
+  function ende(e){delete zeiger[e.pointerId];start=Object.keys(zeiger).length?{v:los(),z:JSON.parse(JSON.stringify(zeiger))}:null}
+  cv.addEventListener("pointerup",ende);cv.addEventListener("pointercancel",ende);
+  cv.addEventListener("wheel",function(e){e.preventDefault();var v=los();if(!v)return;UI.ansicht={lat:v.lat,lon:v.lon,mpp:Math.max(.3,Math.min(40,v.mpp*(e.deltaY>0?1.15:1/1.15)))};zeichnen()},{passive:false});
+})();
+window.addEventListener("resize",zeichnen);
+
+/* ================================================================ Vorführung */
+var DEMOSIM=(function(){
+  // Zwei erfundene Felder bei Bayerstetten (Nesselwang), Silo am Hof.
+  var L0=47.61596,O0=10.49014,MX=111320*Math.cos(L0*Math.PI/180),MY=111132;
+  function ll(x,y){return [L0+y/MY,O0+x/MX]}
+  function rechteck(x,y,b,hh,w){var c=Math.cos(w),s=Math.sin(w);return [[0,0],[b,0],[b,hh],[0,hh]].map(function(p){return ll(x+p[0]*c-p[1]*s,y+p[0]*s+p[1]*c)})}
+  var F=[{id:"fs-4711",name:"Moosacker",ha:0,kunde:"Hof Huber",grenze:[rechteck(160,-60,250,170,.18)]},
+         {id:"fs-4712",name:"Hinterfeld",ha:0,kunde:"Hof Huber",grenze:[rechteck(-260,140,190,120,-.12)]},
+         {id:"fs-0901",name:"Breite",ha:0,kunde:"Hof Berger",grenze:[rechteck(-220,-260,230,140,.05)]}];
+  function flaeche(r){var a=0;for(var i=0;i<r.length;i++){var p=r[i],q=r[(i+1)%r.length];a+=(p[1]*MX)*(q[0]*MY)-(q[1]*MX)*(p[0]*MY)}return Math.abs(a)/2/1e4}
+  F.forEach(function(f){f.ha=Math.round(flaeche(f.grenze[0])*100)/100});
+  var T0=Date.now()/1000,heute=new Date(),datum=heute.getFullYear()+"-"+pad(heute.getMonth()+1)+"-"+pad(heute.getDate());
+  var A={typ:"vyrel-auftrag",id:"A-"+datum.replace(/-/g,"")+"-3F1A9C",name:"Gras 4. Schnitt",datum:datum,
+    kunde:{name:"Hof Huber",anschrift:"Bayerstetten 4, 87484 Nesselwang",ansprechpartner:"Josef Huber",telefon:""},arbeitsgang:"Häckseln",
+    saetze:{haecksler_eur_h:265,abfahrer_eur_h:68},abrechnung:{haecksler:"feld",abfahrer:"einsatz",runden_h:0.1},
+    felder:F.slice(0,2),silo:{lat:L0+0.0003,lon:O0-0.0004},abfahrer_hand:[{id:"h1",name:"Fendt 728 · Toni"},{id:"h2",name:"MF 7480 · Sepp"}],notiz:""};
+  var Z={rolle:"haecksler",status:"laeuft",seit:T0-2*3600-14*60,start:T0-2*3600-14*60,
+    hand:{h1:{laeuft:true,seit:T0-2*3600-20*60,s:0},h2:{laeuft:true,seit:T0-1*3600-55*60,s:0}},
+    basis:{haecksler:{feld_fahrt:5960,feld_stand:1180,strasse:420,stand:90,pause:1800},abfahrer:{feld_fahrt:1720,feld_stand:640,strasse:2650,silo:1460,stand:210,pause:1800}},
+    lauf:{haecksler:{},abfahrer:{}},letzt:T0,vorschau:null};
+  // Weg des Häckslers: Bahnen im Moosacker; Abfahrer: Feld – Straße – Silo – zurück.
+  var BREITE=9,LAENGE=230,BAHNEN=16;
+  function haeckslerXY(t){var v=7/3.6,d=(t*v)%(BAHNEN*(LAENGE+BREITE)),b=Math.floor(d/(LAENGE+BREITE)),r=d-b*(LAENGE+BREITE);
+    var x=r<LAENGE?(b%2?LAENGE-r:r):(b%2?0:LAENGE),y=10+b*BREITE+(r>=LAENGE?(r-LAENGE):0),k=r<LAENGE?(b%2?270:90):0;
+    var c=Math.cos(.18),s=Math.sin(.18),X=170+x*c-y*s,Y=-50+x*s+y*c;return {p:ll(X,Y),kurs:(k-10.3+360)%360,kmh:r<LAENGE?7+Math.sin(t/9)*.6:4}}
+  function abfahrerXY(t){var zyk=900,u=t%zyk,hx=haeckslerXY(t),silo=[ (A.silo.lon-O0)*MX,(A.silo.lat-L0)*MY ];
+    if(u<330){var q=hx.p;return {p:[q[0]+0.00004,q[1]+0.00005],kurs:hx.kurs,kmh:hx.kmh,z:"feld"}}
+    var feldrand=[150,-40];
+    function zw(a,b,f){return [a[0]+(b[0]-a[0])*f,a[1]+(b[1]-a[1])*f]}
+    if(u<570){var f=(u-330)/240,pt=zw(feldrand,silo,f);return {p:ll(pt[0],pt[1]),kurs:300,kmh:28,z:"strasse"}}
+    if(u<690){return {p:ll(silo[0]+4,silo[1]-3),kurs:300,kmh:.4,z:"silo"}}
+    var g=(u-690)/210,pu=zw(silo,feldrand,g);return {p:ll(pu[0],pu[1]),kurs:120,kmh:27,z:"strasse"}}
+  function imFeld(p){for(var i=0;i<A.felder.length;i++){var r=A.felder[i].grenze[0],x=p[1],y=p[0],drin=false;
+    for(var a=0,b=r.length-1;a<r.length;b=a++){if((r[a][0]>y)!==(r[b][0]>y)&&x<(r[b][1]-r[a][1])*(y-r[a][0])/(r[b][0]-r[a][0])+r[a][1])drin=!drin}if(drin)return A.felder[i]}return null}
+  var spur={haecksler:[],abfahrer:[]};
+  function schritt(){var t=Date.now()/1000,dtt=Math.min(5,t-Z.letzt);Z.letzt=t;
+    ["haecksler","abfahrer"].forEach(function(r){var w=r==="haecksler"?haeckslerXY(t-T0+5000):abfahrerXY(t-T0+5000),f=imFeld(w.p),z;
+      if(Z.status!=="laeuft")z=Z.status==="pause"?"pause":"ausserhalb";
+      else if(f)z=w.kmh<1?"feld_stand":"feld_fahrt";else if(w.z==="silo")z="silo";else z=w.kmh<1?"stand":"strasse";
+      Z.lauf[r][z]=(Z.lauf[r][z]||0)+dtt;
+      var sp=spur[r];if(!sp.length||t-sp[sp.length-1][2]>2){sp.push([w.p[0],w.p[1],t]);if(sp.length>400)sp.shift()}
+      Z["pos_"+r]={lat:w.p[0],lon:w.p[1],kmh:w.kmh,kurs:w.kurs,alter_s:0.4,zustand:z,feld_id:f?f.id:"",feld_name:f?f.name:""}});
+    Object.keys(Z.hand).forEach(function(k){var x=Z.hand[k];if(x.laeuft&&Z.status!=="pause")x.s+=dtt})}
+  // Vorlauf der Spur, damit die Karte nicht leer anfängt
+  (function(){var t=Date.now()/1000;for(var i=180;i>0;i--){["haecksler","abfahrer"].forEach(function(r){var w=r==="haecksler"?haeckslerXY(t-T0+5000-i*4):abfahrerXY(t-T0+5000-i*4);spur[r].push([w.p[0],w.p[1],t-i*4])})}})();
+  function rund(h,r){return r?Math.floor(h/r+.5+1e-9)*r:h}
+  function stand(){schritt();var r=Z.rolle,zs={},b=Z.basis[r],l=Z.lauf[r];
+    Object.keys(b).forEach(function(k){zs[k]=b[k]});Object.keys(l).forEach(function(k){if(k!=="ausserhalb")zs[k]=(zs[k]||0)+l[k]});
+    var art=A?A.abrechnung[r==="haecksler"?"haecksler":"abfahrer"]:"feld",feld=(zs.feld_fahrt||0)+(zs.feld_stand||0),eins=0;
+    Object.keys(zs).forEach(function(k){if(k!=="pause")eins+=zs[k]});var ab=art==="feld"?feld:eins,satz=A?A.saetze[r==="haecksler"?"haecksler_eur_h":"abfahrer_eur_h"]:null,std=rund(ab/3600,A?A.abrechnung.runden_h:.1);
+    var fs={};if(A){fs[A.felder[0].id]=feld*0.82;if(A.felder[1])fs[A.felder[1].id]=feld*0.18}
+    var hand=A?A.abfahrer_hand.map(function(x){var z=Z.hand[x.id]||{laeuft:false,s:0,seit:null};var s=(z.s||0)+(z.basis||0)+(x.id==="h1"?6220:x.id==="h2"?4890:0);var st=rund(s/3600,A.abrechnung.runden_h);
+      return {id:x.id,name:x.name,laeuft:z.laeuft,seit:z.seit,abrechnung_s:s,stunden:st,betrag:A.saetze.abfahrer_eur_h!=null?st*A.saetze.abfahrer_eur_h:null}}):[];
+    var sp=spur[r].map(function(q){return [q[0],q[1]]});
+    return {ok:true,demo:true,rolle:r,knoten:{name:r==="haecksler"?"BiG X 650":"Fendt 724 + Jumbo"},jetzt:Date.now()/1000,status:A?Z.status:"offen",status_seit:Z.seit,auftrag:A,
+      position:Z["pos_"+r],spur:sp,zeiten:{zustaende_s:zs,einsatz_s:eins,feld_s:feld,pause_s:zs.pause||0,abrechnung_s:ab,art:art,stunden:std,satz:satz,betrag:satz!=null?std*satz:null,
+        erste:Z.start,letzte:Date.now()/1000,felder_s:fs},
+      hand:r==="haecksler"?hand:[],kette:r==="haecksler"?{dran_name:(Date.now()/1000-T0+5000)%900<330?"Fendt 724 + Jumbo":"",ladungen:[{name:"Fendt 724 + Jumbo",kennung:"AB-X4ZGML",anzahl:9,mittel_s:318}]}:null,
+      hinweise:[]}}
+  function beispieldatei(){return {typ:"vyrel-auftrag",version:1,quelle:"VYREL Feldkarte Bayerstetten (Beispiel)",felder:F.map(function(f){return {id:f.id,name:f.name,ha:f.ha,kunde:{name:f.kunde},arbeitsgaenge:["M","S","H"],grenze:f.grenze}})}}
+  function post(pfad,d){var t=Date.now()/1000;
+    if(pfad==="/auftrag/aktion"){var w=d.aktion;
+      if(w==="start"||w==="weiter"){Z.status="laeuft";Z.seit=t;return {stand:stand(),text:w==="start"?"Auftrag läuft. Die Stunden zählen.":"Weiter. Pause beendet."}}
+      if(w==="pause"){Z.status="pause";Z.seit=t;return {stand:stand(),text:"Pause. Die Zeit zählt nicht."}}
+      if(w==="ende"){Z.status="beendet";Z.seit=t;Object.keys(Z.hand).forEach(function(k){Z.hand[k].laeuft=false});return {stand:stand(),text:"Auftrag beendet. Alle Uhren der Abfahrer gestoppt."}}
+      if(w==="hand_start"){Z.hand[d.id]=Z.hand[d.id]||{s:0};Z.hand[d.id].laeuft=true;Z.hand[d.id].seit=t;return {stand:stand()}}
+      if(w==="hand_ende"){if(Z.hand[d.id])Z.hand[d.id].laeuft=false;return {stand:stand()}}
+      if(w==="hand_neu"){var id="h"+(A.abfahrer_hand.length+1)+"x";A.abfahrer_hand.push({id:id,name:d.name});Z.hand[id]={laeuft:false,s:0,seit:null};return {stand:stand(),text:d.name+" eingetragen."}}
+      if(w==="silo"){var p=Z["pos_"+Z.rolle];A.silo={lat:p.lat,lon:p.lon};return {stand:stand(),text:"Silo gesetzt."}}
+      if(w==="silo_weg"){A.silo=null;return {stand:stand(),text:"Silo entfernt."}}}
+    if(pfad==="/auftrag/daten"){A.name=d.name;A.arbeitsgang=d.arbeitsgang;A.notiz=d.notiz;A.kunde=d.kunde;A.saetze=d.saetze;A.abrechnung=d.abrechnung;return {stand:stand()}}
+    if(pfad==="/auftrag/einlesen"){var j;try{j=JSON.parse(d.text)}catch(e){return {fehler:"Weder JSON noch KML. In der Vorführung geht nur die Beispieldatei."}}
+      var ff=(j.felder||[]).map(function(f){return {id:f.id,name:f.name,ha:f.ha,kunde:f.kunde&&f.kunde.name||f.kunde||"",grenze:f.grenze}});
+      if(!ff.length)return {fehler:"In der Datei steht kein brauchbares Feld."};Z.vorschau=ff;
+      var ks=[];ff.forEach(function(f){if(ks.indexOf(f.kunde)<0)ks.push(f.kunde)});return {vorschau:{marke:"demo",felder:ff,kunden:ks,hinweise:[]}}}
+    if(pfad==="/auftrag/uebernehmen"){var neu=(Z.vorschau||[]).filter(function(f){return d.felder.indexOf(f.id)>=0});
+      A.felder=neu;A.kunde=Object.assign({},A.kunde,{name:d.kunde});A.name=d.name;Z.status="offen";Z.seit=t;
+      Z.basis={haecksler:{},abfahrer:{}};Z.lauf={haecksler:{},abfahrer:{}};Z.start=null;return {stand:stand(),text:"Auftrag übernommen: "+neu.length+" Felder. Jetzt Start drücken."}}
+    return {fehler:"unbekannt"}}
+  return {stand:stand,post:post,beispieldatei:beispieldatei,rolle:function(r){Z.rolle=r}};
+})();
+document.addEventListener("click",function(e){var b=e.target.closest("[data-demo-rolle]");if(!b)return;DEMOSIM.rolle(b.getAttribute("data-demo-rolle"));tastenSchluessel="";UI.ansicht=null;holen();bearbeitenBauen()});
+
+/* ================================================================ Takt */
+function uhrTakt(){var d=new Date();$("k_uhr").textContent=pad(d.getHours())+":"+pad(d.getMinutes())}
+uhrTakt();setInterval(uhrTakt,10000);
+holen();setInterval(holen,DEMO?1000:1500);
+try{if(navigator.wakeLock)navigator.wakeLock.request("screen").catch(function(){})}catch(e){}
+})();
+</script>
+
+</body>
+</html>

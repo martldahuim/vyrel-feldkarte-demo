@@ -1,10 +1,16 @@
 # VYREL Feldkarte – Demo
 
-Vorführung: Auf ein Feld zoomen, Feld antippen, Arbeitsgang und Kunde markieren.
+Zwei Vorführungen, nur Beispieldaten, keine Projektunterlagen:
 
+- **Feldkarte** (Startseite): Auf ein Feld zoomen, Feld antippen, Arbeitsgang und Kunde markieren. Unten „Für den Pi“: die markierten Felder als Auftrag kopieren.
+  https://martldahuim.github.io/vyrel-feldkarte-demo/
+- **Auftrag** (Tablet im Schlepper): Felder, Kunde, Start/Pause/Ende und Stunden für Häcksler und Abfahrer. Unter „Auftrag bearbeiten“ den kopierten Text einfügen oder die Beispieldatei nehmen.
+  https://martldahuim.github.io/vyrel-feldkarte-demo/auftrag/
+
+Quellen der Feldkarte:
 - Startpunkt: Bayerstetten, 87484 Nesselwang
 - Luftbild live: Bayerische Vermessungsverwaltung – www.geodaten.bayern.de (DOP20); Ersatz: Esri World Imagery
 - Feldgrenzen live: InVeKoS-Feldstücke Bayern; Ersatz: OpenStreetMap-Mitwirkende
 - Kunden und Markierungen sind Beispiele und bleiben nur im eigenen Browser gespeichert.
 
-Diese Seite enthält nur die Kartenvorführung, keine Projektunterlagen.
+Die Auftrag-Seite rechnet hier mit erfundenen Daten (Felder, Fahrten, Stunden). Auf dem Pi zeigt dieselbe Seite die echte Position und die echten Stunden.
