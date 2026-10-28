@@ -2,10 +2,10 @@
 
 Zwei Vorführungen, nur Beispieldaten, keine Projektunterlagen:
 
-- **Feldkarte** (Startseite): Auf ein Feld zoomen, Feld antippen, Arbeitsgang und Kunde markieren. Unten „Für den Pi“: die markierten Felder als Auftrag kopieren.
+- **Feldkarte**: Auf ein Feld zoomen, Feld antippen, Arbeitsgang und Kunde markieren. Unten „Für den Pi“: die markierten Felder als Auftrag kopieren.
+  https://martldahuim.github.io/vyrel-feldkarte-demo/feldkarte/
+- **Auftrag** (Startseite, Tablet im Schlepper): Felder, Kunde, Start/Pause/Ende und Stunden für Häcksler und Abfahrer. Unter „Auftrag bearbeiten“ den kopierten Text einfügen oder die Beispieldatei nehmen.
   https://martldahuim.github.io/vyrel-feldkarte-demo/
-- **Auftrag** (Tablet im Schlepper): Felder, Kunde, Start/Pause/Ende und Stunden für Häcksler und Abfahrer. Unter „Auftrag bearbeiten“ den kopierten Text einfügen oder die Beispieldatei nehmen.
-  https://martldahuim.github.io/vyrel-feldkarte-demo/auftrag/
 
 Quellen der Feldkarte:
 - Startpunkt: Bayerstetten, 87484 Nesselwang
