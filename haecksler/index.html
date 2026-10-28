@@ -1,0 +1,1667 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="theme-color" content="#06090d"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<title>VYREL Häcksler · Vorführung</title>
+<!--
+  ============================================================================
+  VYREL · TESTTAG — die Anzeige für Feldtest 1 (RTK ohne Kamera)
+  ============================================================================
+
+  Stand 30.09.2026. Ersetzt die Anzeige vom 29.09. Die Daten, die Rolle,
+  die Regeln gegen eingefrorene Zahlen und die Fahrzeugmaße sind dieselben;
+  neu sind die Optik und drei Ansichten. Seit dem Nachmittag des 30.09.
+  trägt die Anzeige den Namen VYREL statt Franz (claude/NAMENSORDNUNG.md).
+
+  Optik aus claude/VYREL_HMI_Vorfuehrung.html übernommen:
+    Befehlsleiste "kontrast-groß" mit laufenden Pfeilen, Tempo-Instrumente
+    mit Bogen, Leiste unter der Befehlsleiste, Glas-Tafeln, runde Tasten,
+    Kettenband als Pille, Rollenfarben (Leitmaschine kühles Blaugrau,
+    Gespann warmes Grau), Tag und Nacht als zwei eigene Farbsätze.
+
+  Was bewusst anders ist als in der Vorführung, und warum:
+
+    Keine Fahranweisung. Test 1 misst, er führt nicht. Die Befehlsleiste
+    trägt deshalb die Güte der Messung (RTK FIX / NUR FLOAT / KEIN RTK)
+    und als große Zahl den Längsversatz — die Hauptaussage des Tests.
+    Die Leiste darunter zeigt die Längslage statt der Befüllzone.
+
+    Keine Schrift aus dem Netz. Die Vorführung lädt IBM Plex von Google;
+    im Feld gibt es kein Internet. Hier stehen Plex nur noch als Wunsch
+    vorn in der Liste, danach Roboto (Fire OS) und die Systemschrift.
+
+    Die Rolle wird nicht gewählt. Der Knoten wurde mit ihr gestartet.
+
+  Neu:
+    MASSBAND    Bandmessung gegen das RTK-Mittel der letzten 5 s
+    PRÜFLISTE   die Schritte des Feldtags, abhakbar, mit Notiz
+    Ansagen     ruhige Sätze mit Zweiklang: FIX, Funk, Verbindung, dran
+    Protokoll   jede Ansage, jeder Alarm, jeder Ansichtswechsel geht an
+                den Pi (/hmi) und steht in *_testtag.jsonl
+
+  Unverändert wichtig:
+    Eine Zahl, die nicht mehr erneuert wird, verschwindet. Die Seite prüft
+    selbst, wann der Pi zuletzt geantwortet hat — nach der Uhr DIESES
+    Tablets, nie nach der des Pi.
+  ============================================================================
+-->
+<style>
+:root{
+  --grund:#06090d; --grund2:#0b1017; --grund3:#101823;
+  --karte:rgba(150,180,215,.055); --karte-voll:#0f151d; --karte-hoch:#17202b;
+  --linie:rgba(150,185,220,.13); --linie-hell:rgba(150,185,220,.24);
+  --gold:#e9ae47; --gold-hell:#ffd47e; --gold-tief:#3a2a0d; --auf-farbe:#15100a;
+  --mess:#5fd8ea; --mess-tief:#0d3a44;
+  --text:#eef3f7; --still:rgba(208,222,236,.56); --leise:rgba(208,222,236,.2);
+  --gruen:#34c26b; --gelb:#f0c332; --rot:#ef4a3e; --auf-rot:#ffffff;
+  --schein:.55;
+  --lead:#8aa0b8; --lead-tief:#3c4b5c; --gespann:#b0a597; --gespann-tief:#5d5549;
+  --feld:#0d110b; --raster:rgba(95,216,234,.07); --raster-stark:rgba(95,216,234,.16);
+  --f-text:"IBM Plex Sans", Roboto, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-eng:"IBM Plex Sans Condensed", "Roboto Condensed", "sans-serif-condensed", "Arial Narrow", Roboto, system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", "Roboto Mono", ui-monospace, Menlo, Consolas, monospace;
+  --rund:14px; --rund-gross:20px;
+  color-scheme:dark;
+}
+/* Tag: gegen Sonne, nicht die Nacht heller gedreht. */
+:root.tag{
+  --grund:#e9ecef; --grund2:#dfe4e9; --grund3:#d4dae1;
+  --karte:rgba(255,255,255,.72); --karte-voll:#ffffff; --karte-hoch:#ffffff;
+  --linie:rgba(20,40,60,.13); --linie-hell:rgba(20,40,60,.24);
+  --gold:#935f05; --gold-hell:#6a4403; --gold-tief:#f3e3c0; --auf-farbe:#fffaf0;
+  --mess:#0a7f95; --mess-tief:#d3eef3;
+  --text:#0f151b; --still:rgba(15,21,27,.6); --leise:rgba(15,21,27,.22);
+  --gruen:#128140; --gelb:#a37300; --rot:#b3261e; --auf-rot:#ffffff;
+  --schein:0;
+  --lead:#56697d; --lead-tief:#2e3a46; --gespann:#8a7f71; --gespann-tief:#4d463d;
+  --feld:#f4f6f7; --raster:rgba(10,90,110,.10); --raster-stark:rgba(10,90,110,.22);
+  color-scheme:light;
+}
+
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--grund);color:var(--text);
+  font-family:var(--f-text);-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+button,input{font:inherit;color:inherit}
+button:focus-visible{outline:2px solid var(--gold);outline-offset:-2px}
+
+#geraet{position:relative;display:flex;flex-direction:column;height:100%;color:var(--text);overflow:hidden;background:var(--grund);
+  background:radial-gradient(120% 60% at 50% -10%,var(--grund3),transparent 60%),linear-gradient(180deg,var(--grund2),var(--grund))}
+
+/* ------------------------------------------------------------------ Kopf */
+.kopf{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:0 14px;height:clamp(38px,6vh,48px);font-size:12px}
+.kopf .rolle{font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);white-space:nowrap;font-size:12px;display:flex;align-items:center;gap:8px}
+.kopf .rolle::before{content:"";width:9px;height:9px;border-radius:3px;background:var(--gold);box-shadow:0 0 12px rgba(233,174,71,var(--schein))}
+.kopf .schlag{color:var(--still);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.kopf .rechts{margin-left:auto;display:flex;align-items:center;gap:10px;flex:0 0 auto}
+.stat{display:inline-flex;align-items:center;gap:6px;white-space:nowrap;color:var(--still)}
+.punkt{width:8px;height:8px;border-radius:50%;display:inline-block;background:var(--rot)}
+.balken4{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+.balken4 i{display:block;width:3px;background:var(--leise);border-radius:1px}
+.balken4 i:nth-child(1){height:4px}.balken4 i:nth-child(2){height:6px}.balken4 i:nth-child(3){height:9px}.balken4 i:nth-child(4){height:12px}
+.balken4.b1 i:nth-child(-n+1),.balken4.b2 i:nth-child(-n+2),.balken4.b3 i:nth-child(-n+3),.balken4.b4 i{background:var(--text)}
+.balken4.aus i{background:var(--rot);opacity:.6}
+.uhrzeit{font:600 14px var(--f-eng);color:var(--text);letter-spacing:.04em}
+.knopfklein{background:var(--karte);color:var(--still);border:0;box-shadow:inset 0 0 0 1px var(--linie);border-radius:999px;
+  font-size:11px;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.knopfklein:active{background:var(--karte-hoch)}
+.knopfklein.an{color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold-tief)}
+@media (max-width:560px){.kopf .schlag,.kopf .uhrzeit{display:none}.kopf{gap:8px;padding:0 10px}.kopf .rechts{gap:7px}}
+
+/* ------------------------------------------------------------------ Band */
+.band{flex:0 0 auto;display:flex;align-items:center;gap:10px;margin:0 8px;padding:6px 12px;border-radius:999px;
+  background:var(--karte);box-shadow:inset 0 0 0 1px var(--linie);font-size:13px;white-space:nowrap;overflow:hidden;min-height:30px}
+.band .bandmarke{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--still);flex:0 0 auto;font-weight:700}
+.band .bandtext{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;font-weight:700}
+.band .bandzahl{flex:0 0 auto;color:var(--still);font-size:12px}
+.band.dran{background:linear-gradient(90deg,var(--gold-tief),transparent 90%);box-shadow:inset 0 0 0 1px var(--gold-tief)}.band.dran .bandtext{color:var(--gold-hell)}
+.band.wartet .bandtext{color:var(--gelb)}.band.leer .bandtext{color:var(--still);font-weight:600}
+
+.alarm{flex:0 0 auto;margin:6px 8px 0;border-radius:12px;background:var(--rot);color:var(--auf-rot);padding:7px 10px;text-align:center;
+  font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;animation:puls 1.4s ease-in-out infinite}
+@keyframes puls{50%{box-shadow:0 0 0 4px rgba(239,74,62,.25);filter:brightness(.85)}}
+
+/* ---------------------------------------------------------- Befehlsleiste
+   Aus der Vorführung. Hier trägt sie die Güte der Messung und den
+   Längsversatz — Test 1 misst, er führt nicht. */
+.befehl{--bw:min(clamp(30px,8.4vh,92px),11vw);--farbe:var(--gold);--auf:var(--auf-farbe);
+  position:relative;flex:0 0 auto;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;
+  gap:clamp(10px,2vw,22px);margin:8px 8px 0;padding:clamp(8px,1.5vh,15px) clamp(14px,2.4vw,26px);
+  min-height:clamp(72px,15vh,150px);border-radius:var(--rund-gross);overflow:hidden;color:var(--auf);
+  background:var(--farbe);
+  background:linear-gradient(135deg,var(--farbe),color-mix(in srgb,var(--farbe) 78%,#000));
+  box-shadow:0 10px 40px -12px color-mix(in srgb,var(--farbe) calc(var(--schein)*100%),transparent),inset 0 1px 0 rgba(255,255,255,.25);
+  transition:background .3s,box-shadow .3s}
+.befehl::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.12),transparent 45%);pointer-events:none}
+.befehl.gruen{--farbe:var(--gruen);--auf:#fff}
+.befehl.rot{--farbe:var(--rot);--auf:var(--auf-rot)}
+.befehl.gelb{--farbe:var(--gelb);--auf:#15110a;background:repeating-linear-gradient(-45deg,var(--gelb) 0 22px,color-mix(in srgb,var(--gelb) 80%,#000) 22px 44px)}
+.befehl.still{--farbe:var(--karte-voll);--auf:var(--text);background:var(--karte);box-shadow:inset 0 0 0 1px var(--linie)}
+.befehl.still .psym{color:var(--gold)}
+.befehl .pfeil{position:relative;width:clamp(44px,8vh,88px);height:clamp(50px,10vh,110px);display:grid;place-items:center}
+.befehl .psym{font:700 clamp(30px,7vh,80px)/1 var(--f-eng)}
+.befehl .chev{position:absolute;inset:0;display:none}
+.befehl .chev i{position:absolute;left:50%;width:58%;aspect-ratio:1;border:solid currentColor;border-width:clamp(5px,.9vh,9px) clamp(5px,.9vh,9px) 0 0;
+  transform:translate(-50%,-50%) rotate(-45deg);opacity:0;animation:chev 1.2s linear infinite}
+.befehl .chev i:nth-child(2){animation-delay:.4s}.befehl .chev i:nth-child(3){animation-delay:.8s}
+@keyframes chev{0%{top:85%;opacity:0}25%{opacity:1}75%{opacity:1}100%{top:18%;opacity:0}}
+.befehl.vor .chev,.befehl.zurueck .chev{display:block}
+.befehl.vor .psym,.befehl.zurueck .psym{display:none}
+.befehl.zurueck .chev{transform:scaleY(-1)}
+.befehl .bw{margin:0;font:700 calc(var(--bw) * var(--f,1))/.95 var(--f-eng);letter-spacing:.005em;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.befehl .bs{margin-top:clamp(4px,.8vh,9px);font-size:clamp(12px,1.9vh,17px);font-weight:600;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.befehl .bz{text-align:right;font:700 clamp(30px,8vh,86px)/1 var(--f-eng);white-space:nowrap}
+.befehl .bz small{display:block;font:600 clamp(10px,1.4vh,12px)/1.2 var(--f-text);letter-spacing:.14em;text-transform:uppercase;opacity:.78;margin-top:5px}
+@media (max-width:560px){.befehl{--bw:min(8vh,11vw);gap:10px;padding:10px 12px}
+  .befehl .bs{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+  .befehl .pfeil{width:30px;height:54px}.befehl .psym{font-size:30px}.befehl .bz{font-size:clamp(24px,8.5vw,40px)}}
+
+/* ------------------------------------------------------------ Tempo */
+.tempo{flex:0 0 auto;display:grid;grid-template-columns:1fr 1.25fr 1fr;gap:8px;margin:8px 8px 0}
+.tinst{position:relative;background:var(--karte);border-radius:var(--rund);box-shadow:inset 0 0 0 1px var(--linie);
+  padding:clamp(6px,1.2vh,12px) 12px;min-width:0;display:flex;flex-direction:column;justify-content:center}
+.tinst .tm{font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--still);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tinst .tz{font:700 clamp(24px,5.4vh,54px)/1 var(--f-eng);letter-spacing:-.01em;white-space:nowrap;margin-top:3px}
+.tinst .tz small{font:500 clamp(10px,1.5vh,13px) var(--f-text);color:var(--still);margin-left:4px;letter-spacing:0}
+.tinst .tu{font-size:clamp(10.5px,1.5vh,12.5px);color:var(--still);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tinst.gold .tz{color:var(--gold)}
+.tinst.ich{align-items:center;text-align:center;justify-content:flex-end;padding-top:clamp(14px,3vh,30px);padding-bottom:clamp(5px,1vh,9px);min-height:clamp(84px,15vh,150px)}
+.tinst.ich{overflow:hidden}
+.tinst.ich svg{position:absolute;left:0;right:0;top:4px;width:100%;height:calc(100% + 26px)}
+.tinst.ich .tz{position:relative;order:1;font-size:clamp(26px,5.6vh,56px);margin-top:0}
+.tinst.ich .tm{position:relative;order:2;margin-top:2px}
+.tinst.ich .delta{order:3}
+.tinst .delta{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;font:700 clamp(11px,1.6vh,13px) var(--f-eng);background:var(--leise);color:var(--text);position:relative;white-space:nowrap}
+.tinst .delta.plus{background:var(--gold);color:var(--auf-farbe)}
+.tinst .delta.minus{background:var(--mess);color:#03141a}
+.tinst .delta.gut{background:var(--gruen);color:#fff}
+.bogen-grund{fill:none;stroke:var(--leise);stroke-linecap:round}
+.bogen-wert{fill:none;stroke:var(--text);stroke-linecap:round}
+.bogen-h{stroke:var(--mess);stroke-linecap:round}
+.tempo.veraltet .tinst{opacity:.38}
+@media (max-width:560px){.tempo{gap:6px}.tinst{padding:6px 8px}.tinst .tu{display:none}
+  .tinst:not(.ich) .tz small{display:none}.tinst .tz{font-size:clamp(22px,5vh,36px)}
+  .tinst.ich .tz{font-size:clamp(22px,4.4vh,34px)}.tinst.ich{padding-top:clamp(18px,4vh,32px)}}
+
+/* --------------------------------------------------------- Längslage
+   Dieselbe Leiste wie die Stellungsleiste der Vorführung. Hier zeigt sie
+   die Lage des Abfahrers längs zum Häcksler: 0 ist der Häcksler, rechts
+   ist vorn. Die Messfarbe ist der Abfahrer; ist die Lage nicht auf
+   Zentimeter genau, wird der Punkt so breit wie seine Unsicherheit. */
+.lage{flex:0 0 auto;margin:8px 8px 0;padding:clamp(6px,1.1vh,10px) 12px clamp(6px,1.1vh,10px);background:var(--karte);border-radius:var(--rund);box-shadow:inset 0 0 0 1px var(--linie)}
+.lg-kopf{display:flex;justify-content:space-between;gap:10px;font-size:9.5px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--still);white-space:nowrap}
+.lg-kopf b{color:var(--text);letter-spacing:.06em;font-size:11px;overflow:hidden;text-overflow:ellipsis}
+.lg-bahn{position:relative;height:clamp(22px,3.8vh,34px);margin-top:clamp(5px,1vh,8px);border-radius:8px;background:var(--karte-voll);box-shadow:inset 0 0 0 1px var(--linie);overflow:visible}
+.lg-strich{position:absolute;top:0;bottom:0;width:1px;background:var(--linie-hell)}
+.lg-haecksler{position:absolute;top:3px;bottom:3px;border-radius:5px;background:var(--lead);opacity:.9}
+.lg-null{position:absolute;top:-5px;bottom:-5px;width:3px;margin-left:-1.5px;background:var(--lead);border-radius:2px}
+.lg-ist{position:absolute;top:50%;width:clamp(16px,2.6vh,22px);height:clamp(16px,2.6vh,22px);transform:translate(-50%,-50%);border-radius:50%;
+  background:var(--mess);box-shadow:0 0 0 3px var(--karte-voll),0 0 16px var(--mess);transition:left .2s linear,width .2s}
+.lg-ist.unscharf{border-radius:999px;background:color-mix(in srgb,var(--gelb) 40%,transparent);box-shadow:0 0 0 2px var(--gelb)}
+.lg-ist.aus{display:none}
+.lg-skala{position:relative;height:13px;margin-top:3px;font-size:9.5px;color:var(--still)}
+.lg-skala span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.lg-skala span:first-child{transform:none}.lg-skala span:last-child{transform:translateX(-100%)}
+
+/* ---------------------------------------------------------------- Fläche */
+.flaeche{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;overflow:hidden;padding:8px;gap:8px}
+.umschalter{flex:0 0 auto;display:flex;gap:4px;padding:3px;background:var(--karte);border-radius:999px;box-shadow:inset 0 0 0 1px var(--linie)}
+.umschalter button{flex:1 1 0;min-height:clamp(30px,4.6vh,38px);background:transparent;color:var(--still);border:0;border-radius:999px;
+  font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;cursor:pointer}
+.umschalter button.an{color:var(--auf-farbe);background:var(--gold)}
+.tafel{flex:1 1 auto;min-height:0;padding:clamp(8px,1.4vh,14px) 12px;overflow:hidden;background:var(--karte);border-radius:var(--rund-gross);
+  box-shadow:inset 0 0 0 1px var(--linie);display:flex;flex-direction:column}
+.tafel.rollt{overflow-y:auto;-webkit-overflow-scrolling:touch}
+@media (min-width:780px){
+  .flaeche{flex-direction:row}
+  .umschalter{display:none}
+  .tafel{flex:1 1 0;width:0}
+  .tafel.mitte{flex:1.35 1 0}
+  .tafel.breit2{flex:1.6 1 0}
+}
+.marke{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--still);margin:0 0 clamp(5px,1vh,9px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto}
+* + .marke.abst{margin-top:clamp(8px,1.8vh,16px)}
+.zusatz{margin-top:clamp(3px,.9vh,9px);font-size:clamp(11.5px,1.8vh,14px);color:var(--still);line-height:1.45}
+.erklaerung{font-size:12.5px;color:var(--still);line-height:1.5;margin:-2px 0 8px}
+
+/* ---------------------------------------------------------------- Werte */
+.werte{flex:0 0 auto}
+.wertzeile{display:flex;align-items:baseline;gap:12px;padding:clamp(4px,1vh,9px) 2px;box-shadow:inset 0 -1px 0 var(--linie)}
+.wertzeile:last-child{box-shadow:none}
+.wertname{font-size:clamp(11.5px,1.8vh,14px);color:var(--still);white-space:nowrap}
+.wertzahl{margin-left:auto;font:700 clamp(16px,3vh,27px)/1.1 var(--f-eng);white-space:nowrap}
+.wertzahl.gold{color:var(--gold)}.wertzahl.still{color:var(--leise)}.wertzahl.rot{color:var(--rot)}.wertzahl.gruen{color:var(--gruen)}.wertzahl.gelb{color:var(--gelb)}
+.einheit{font:500 .55em var(--f-text);color:var(--still);margin-left:3px}
+
+/* ------------------------------------------------------------ Leinwand */
+.leinwand{position:relative;flex:1 1 auto;min-height:70px;border-radius:var(--rund);overflow:hidden;background:var(--feld);box-shadow:inset 0 0 0 1px var(--linie)}
+.leinwand canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.leinwand .lband{position:absolute;left:0;right:0;bottom:0;padding:6px 10px;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.88);
+  background:linear-gradient(transparent,rgba(0,0,0,.75));display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+:root.tag .leinwand .lband{color:rgba(0,0,0,.78);background:linear-gradient(transparent,rgba(255,255,255,.92))}
+
+/* ---------------------------------------------------------------- Liste */
+.liste{margin:0;padding:0;list-style:none;display:grid;gap:clamp(3px,.7vh,6px);flex:0 0 auto}
+.listzeile{display:flex;align-items:center;gap:10px;background:var(--karte-voll);border-radius:12px;box-shadow:inset 0 0 0 1px var(--linie);
+  padding:clamp(5px,1.1vh,10px) 11px;font-size:clamp(12px,1.85vh,14.5px);overflow:hidden;min-width:0}
+.listicon{flex:0 0 auto;width:clamp(14px,2.3vh,19px);height:clamp(14px,2.3vh,19px);color:var(--still)}
+.listicon svg{width:100%;height:100%;display:block}
+.listname{flex:0 0 auto;max-width:64%;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.listwert{flex:1 1 auto;text-align:right;min-width:0;margin-left:auto;padding-left:8px;font-size:.9em;color:var(--still);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.zeichen{flex:0 0 auto;margin-left:10px;width:clamp(16px,2.5vh,21px);height:clamp(16px,2.5vh,21px);border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff;background:var(--leise)}
+.zeichen svg{width:62%;height:62%}
+.zeichen.gut{background:var(--gruen)}.zeichen.warn{background:var(--gelb);color:#15110a}.zeichen.fehlt{background:var(--rot)}
+
+/* ---------------------------------------------------------------- Kette */
+.kettenzeile{display:flex;align-items:center;gap:10px;padding:clamp(6px,1.3vh,10px) 12px;background:var(--karte-voll);border-radius:var(--rund);box-shadow:inset 0 0 0 1px var(--linie);width:100%;text-align:left;border:0;min-width:0}
+.kettenzeile + .kettenzeile{margin-top:clamp(3px,.7vh,6px)}
+button.kettenzeile{cursor:pointer}
+.kettenzeile.dran{box-shadow:inset 0 0 0 2px var(--gold),0 0 22px -6px rgba(233,174,71,var(--schein))}
+.kettenzeile.weg,.kettenzeile.bekannt{opacity:.55}
+.kettenstand{flex:0 0 auto;width:78px;font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--still)}
+.kettenzeile.dran .kettenstand{color:var(--gold-hell)}
+.kettenzeile.kommt .kettenstand{color:var(--gelb)}
+.kettenname{flex:1 1 auto;min-width:0}
+.kettenname b{display:block;font-size:clamp(13px,2vh,15px);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kettenname span{display:block;font-size:11.5px;color:var(--still);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kettenwert{flex:0 0 auto;text-align:right;font:700 clamp(14px,2.3vh,18px) var(--f-eng);white-space:nowrap}
+.kettenwert small{display:block;font:600 11px var(--f-text);color:var(--still)}
+.kettenneu{flex:0 0 auto;font-size:10px;font-weight:800;letter-spacing:.08em;background:var(--gelb);color:#15110a;border-radius:6px;padding:2px 6px}
+.kettenname span.mono{display:inline}
+.mono{font-family:var(--f-mono);font-size:.92em;letter-spacing:.02em}
+
+/* --------------------------------------------------------------- Tasten */
+.fuss{flex:0 0 auto;display:flex;gap:6px;padding:0 8px 8px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
+.taste{flex:1 1 0;min-width:0;min-height:clamp(44px,7vh,58px);background:var(--karte);border:0;border-radius:14px;box-shadow:inset 0 0 0 1px var(--linie);
+  font-size:clamp(12.5px,2vh,14.5px);font-weight:700;padding:6px 4px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.taste small{font-size:clamp(9px,1.3vh,10.5px);font-weight:500;color:var(--still);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.taste:active{background:var(--karte-hoch)}
+.taste.an{background:var(--gold);color:var(--auf-farbe);box-shadow:none}.taste.an small{color:var(--auf-farbe);opacity:.75}
+.taste:disabled{opacity:.45}
+@media (max-width:560px){.fuss{gap:4px;padding:0 6px 6px}.taste{border-radius:12px}}
+
+/* ----------------------------------------------------------------- Menü */
+.wahl{flex:1 1 auto;min-height:0;padding:clamp(14px,3vh,28px) 16px;overflow-y:auto}
+.wahltitel{margin:4px 0;font:700 clamp(26px,6.5vh,44px)/1 var(--f-eng);text-transform:uppercase}
+.wahlunter{margin:0 0 clamp(12px,2.4vh,22px);color:var(--still);font-size:14.5px;max-width:52ch;line-height:1.45}
+.rollen{display:grid;gap:8px}
+@media (min-width:700px){.rollen{grid-template-columns:1fr 1fr}}
+@media (min-width:1100px){.rollen{grid-template-columns:1fr 1fr 1fr}}
+.rollenkarte{background:var(--karte);border:0;box-shadow:inset 0 0 0 1px var(--linie);border-radius:18px;text-align:left;padding:clamp(10px,2vh,16px);cursor:pointer;display:flex;align-items:center;gap:14px;min-width:0}
+.rollenkarte:active{background:var(--karte-hoch)}
+.rollenkarte.mahnt{box-shadow:inset 0 0 0 1px var(--gelb)}
+.rollenzeichen{flex:0 0 auto;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;color:var(--gold);background:var(--karte-voll);box-shadow:inset 0 0 0 1px var(--linie-hell)}
+.rollenzeichen svg{width:28px;height:28px}
+.rollentext{min-width:0}
+.rollenname{display:block;font-size:16px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+.rollenzweck{display:block;font-size:13px;color:var(--still);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rollenpfeil{margin-left:auto;color:var(--gold);font-size:22px}
+.standliste{margin-top:clamp(12px,2.4vh,22px)}
+
+/* -------------------------------------------------------------- Segment */
+.segment{display:flex;gap:4px;padding:4px;background:var(--karte-voll);border-radius:16px;box-shadow:inset 0 0 0 1px var(--linie);flex:0 0 auto}
+.segment button{flex:1 1 0;min-height:clamp(38px,6vh,52px);border:0;border-radius:12px;background:transparent;font-size:clamp(13px,2vh,16px);font-weight:700;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;min-width:0}
+.segment button small{font-size:clamp(9px,1.3vh,10.5px);font-weight:500;color:var(--still);white-space:nowrap}
+.segment button.an{background:var(--gold);color:var(--auf-farbe);box-shadow:0 4px 18px -6px rgba(233,174,71,var(--schein))}
+.segment button.an small{color:var(--auf-farbe);opacity:.75}
+
+/* -------------------------------------------------------------- Maßband */
+.mb-live{text-align:center;margin:clamp(6px,1.4vh,14px) 0 clamp(4px,1vh,10px)}
+.mb-live .mb-zahl{font:700 clamp(40px,10vh,96px)/.95 var(--f-eng);letter-spacing:-.02em;color:var(--gold-hell);text-shadow:0 0 30px rgba(233,174,71,calc(var(--schein)*.55))}
+.mb-live .mb-zahl small{font-size:.36em;font-weight:600;margin-left:3px}
+.mb-live .mb-zahl.still{color:var(--leise);text-shadow:none}
+.mb-live .mb-unter{font-size:clamp(11.5px,1.8vh,14px);color:var(--still);margin-top:4px}
+.eingabezeile{display:flex;align-items:center;gap:12px;padding:6px 2px;box-shadow:inset 0 -1px 0 var(--linie)}
+.eingabename{flex:1 1 auto;min-width:0;font-size:14px;line-height:1.3}
+.eingabewink{display:block;font-size:11.5px;color:var(--still);margin-top:1px}
+.eingabezeile input{flex:0 0 auto;width:112px;min-height:44px;background:var(--karte-voll);color:var(--text);border:0;box-shadow:inset 0 0 0 1px var(--linie);border-radius:10px;font:700 18px var(--f-eng);text-align:right;padding:6px 10px}
+.eingabezeile input.text{width:min(210px,46vw);text-align:left;font:600 15px var(--f-text)}
+.eingabezeile input.gross{width:min(190px,42vw);min-height:56px;font-size:30px}
+.eingabezeile input.gross::placeholder{font-size:17px;font-weight:500;color:var(--leise)}
+.eingabezeile input:focus{outline:none;box-shadow:inset 0 0 0 2px var(--gold)}
+.eingabezeile input:disabled{color:var(--still);background:transparent}
+.eingabeeinheit{flex:0 0 auto;width:24px;font-size:12.5px;color:var(--still)}
+.meldung{margin:10px 0 0;padding:10px 12px;border-radius:12px;font-size:14px;font-weight:600;line-height:1.4}
+.meldung.gut{background:var(--gold-tief);color:var(--gold-hell)}
+.meldung.schlecht{background:var(--rot);color:#fff}
+.mb-erg{display:flex;align-items:center;gap:14px;margin-top:10px;padding:10px 12px;border-radius:14px;background:var(--karte-voll);box-shadow:inset 0 0 0 2px var(--linie)}
+.mb-erg.gut{box-shadow:inset 0 0 0 2px var(--gruen)}.mb-erg.warn{box-shadow:inset 0 0 0 2px var(--gelb)}.mb-erg.fehlt{box-shadow:inset 0 0 0 2px var(--rot)}
+.mb-erg b{font:700 clamp(28px,6vh,48px)/1 var(--f-eng);white-space:nowrap}
+.mb-erg.gut b{color:var(--gruen)}.mb-erg.warn b{color:var(--gelb)}.mb-erg.fehlt b{color:var(--rot)}
+.mb-erg div{font-size:12.5px;color:var(--still);line-height:1.45;min-width:0}
+.probe{display:grid;grid-template-columns:auto 1fr auto;gap:2px 12px;align-items:center;padding:clamp(6px,1.2vh,10px) 12px;background:var(--karte-voll);border-radius:12px;box-shadow:inset 0 0 0 1px var(--linie)}
+.probe + .probe{margin-top:clamp(3px,.7vh,6px)}
+.probe .pn{font:700 13px var(--f-mono);color:var(--still)}
+.probe .pt{min-width:0}
+.probe .pt b{display:block;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.probe .pt span{display:block;font-size:11.5px;color:var(--still);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.probe .pa{font:700 clamp(18px,3vh,26px)/1 var(--f-eng);text-align:right;white-space:nowrap}
+.probe .pa small{display:block;font:600 10.5px var(--f-text);color:var(--still);letter-spacing:.06em}
+.probe.gut .pa{color:var(--gruen)}.probe.warn .pa{color:var(--gelb)}.probe.fehlt .pa{color:var(--rot)}
+.probe.ungueltig{opacity:.62}
+
+/* ------------------------------------------------------------ Prüfliste */
+.fortschritt{height:8px;border-radius:4px;background:var(--leise);overflow:hidden;margin:4px 0 12px;flex:0 0 auto}
+.fortschritt i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),var(--gruen));transition:width .3s}
+.pgruppe{font-size:9.5px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);margin:14px 0 6px}
+.pgruppe:first-of-type{margin-top:2px}
+.ppunkt{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:start;padding:10px 12px;background:var(--karte-voll);border-radius:14px;box-shadow:inset 0 0 0 1px var(--linie)}
+.ppunkt + .ppunkt{margin-top:6px}
+.ppunkt.erledigt{box-shadow:inset 0 0 0 2px var(--gruen)}
+.phaken{grid-row:1 / span 3;width:44px;height:44px;border-radius:12px;border:0;background:var(--karte);box-shadow:inset 0 0 0 2px var(--linie-hell);display:grid;place-items:center;cursor:pointer;color:transparent}
+.phaken svg{width:26px;height:26px}
+.ppunkt.erledigt .phaken{background:var(--gruen);box-shadow:none;color:#fff}
+.ptitel{font-size:15px;font-weight:700;line-height:1.3}
+.ptitel small{font:600 11.5px var(--f-mono);color:var(--gruen);margin-left:8px}
+.pwink{font-size:12px;color:var(--still);line-height:1.4}
+.pzeile{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:2px}
+.psys{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--karte);box-shadow:inset 0 0 0 1px var(--linie);color:var(--still);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.psys[hidden]{display:none}
+.psys.ja{color:var(--gruen);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--gruen) 50%,transparent)}
+.pnotiz{flex:1 1 160px;width:100%;min-width:0;min-height:36px;background:var(--karte);border:0;box-shadow:inset 0 0 0 1px var(--linie);border-radius:10px;padding:6px 10px;font-size:13.5px;color:var(--text)}
+.pnotiz:focus{outline:none;box-shadow:inset 0 0 0 2px var(--gold)}
+.pnotiz::placeholder{color:var(--leise)}
+
+@media (min-width:700px){
+  .ppunkt{grid-template-columns:auto minmax(0,1fr) minmax(190px,34%)}
+  .ppunkt .pzeile{grid-column:3;grid-row:1 / span 2;flex-direction:column;align-items:stretch;margin-top:0}
+  .ppunkt .phaken{grid-row:1 / span 2}
+  .psys{align-self:flex-start}
+  .ppunkt .pnotiz{flex:0 0 auto}
+}
+.gruppe{margin-bottom:18px}
+.gruppe.fremd{opacity:.6}
+
+/* Das Fire HD 8 quer im Browser: rund 850 × 480 bis 530 Punkte. Dort
+   rückt alles zusammen, Nebensachen gehen, die Hauptaussage bleibt. */
+@media (max-height:640px){
+  .befehl{min-height:0;padding:6px 14px;margin-top:6px;--bw:min(7.6vh,10vw)}
+  .befehl .pfeil{height:clamp(36px,8vh,56px)}
+  .befehl .bs{margin-top:2px;font-size:12px}
+  .befehl .bz{font-size:clamp(28px,7.4vh,48px)}
+  .tempo,.lage{margin-top:6px}
+  .tinst{padding:4px 10px}.tinst .tu{display:none}.tinst .tz{font-size:clamp(20px,4.6vh,30px)}
+  .tinst.ich{min-height:0;padding-top:4px}.tinst.ich svg{display:none}.tinst.ich .tz{font-size:clamp(20px,4.6vh,30px)}
+  .lage{padding:4px 12px 6px}.lg-skala{display:none}.lg-bahn{margin-top:4px}
+  .flaeche{padding:6px;gap:6px}
+  .tafel{padding:7px 10px}
+  .nurhoch{display:none!important}
+  .taste{min-height:40px}
+}
+@media (max-height:470px){
+  .kopf{height:34px;font-size:11px}
+  .band{min-height:24px;padding:3px 10px;font-size:12px}
+  .befehl{min-height:56px;padding:5px 12px;margin-top:6px;--bw:min(8.5vh,9vw)}
+  .befehl .bs{font-size:11px;margin-top:2px}
+  .befehl .pfeil{height:44px}
+  .tempo,.lage{margin-top:6px}
+  .tinst{padding:3px 10px}.tinst .tu{display:none}.tinst.ich svg{display:none}.tinst.ich{min-height:0;padding-top:4px}
+  .lage{padding:4px 10px 5px}.lg-skala{display:none}
+  .flaeche{padding:6px;gap:6px}
+  .taste{min-height:38px}.taste small{display:none}
+  .tafel{padding:6px 10px}
+  .nurhoch{display:none!important}
+}
+/* Sperre bei falschem Rechner: liegt über allem, auch über Eingaben. */
+#sperre{position:fixed;inset:0;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:24px;
+  background:#1a0605;color:var(--auf-rot);text-align:center;box-shadow:inset 0 0 0 6px var(--rot)}
+#sperre[hidden]{display:none}
+#sperre h1{margin:0;font-size:clamp(28px,6vw,52px);letter-spacing:.08em;color:var(--rot)}
+#sperre p{margin:0;max-width:640px;font-size:clamp(16px,2.6vw,22px);line-height:1.45}
+#sperre .mono{font-family:ui-monospace,monospace}
+#sperre button{margin-top:18px;font:inherit;font-size:15px;color:var(--still);background:transparent;border:1px solid var(--leise);border-radius:12px;padding:12px 18px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+<meta name="robots" content="noindex, nofollow">
+<script>window.VYREL_DEMO_ROLLE="haecksler";window.VYREL_AUFTRAG_URL="../auftrag/?rolle=haecksler&zurueck=../haecksler/";</script>
+<script>
+/* ============================================================================
+   VYREL · Vorführung der Kabinen-Anzeige ohne Pi
+   ============================================================================
+   Wird von vorfuehrung/bauen.py VOR static/anzeige.html gesetzt. Ersetzt
+   window.fetch für die Adressen des Pi (/daten, /kette, /konfig, /kennung,
+   /testtag, /massband, /pruefpunkt, /hmi) durch eine erfundene Fahrt um
+   Bayerstetten. Die Anzeige selbst bleibt unverändert die Datei des Pi.
+
+   Ablauf je Runde (300 s), aus Sicht des Häckslers:
+       0– 30 s  Abfahrer kommt von hinten heran
+      30–200 s  Abfahrer dran, fährt neben dem Häcksler (pendelt leicht),
+                bei 120–128 s kurz nur FLOAT
+     200–230 s  Abfahrer zieht ab (voll)
+     230–300 s  keiner dran, der nächste ist unterwegs
+   Die Häcksler-Ansicht wechselt jede Runde zwischen zwei Abfahrern, die
+   Abfahrer-Ansicht ist immer der Fendt.
+
+   VORLAGEN (Antworten eines echten feldtest.py im Spielbetrieb) setzt
+   bauen.py ein; die Sim ändert darin nur die beweglichen Werte.
+   ============================================================================ */
+(function(){
+"use strict";
+var ROLLE=window.VYREL_DEMO_ROLLE==="abfahrer"?"abfahrer":"haecksler";
+var V={"abfahrer_daten":{"bereit":true,"rolle":"abfahrer","haecksler":{"zeit_s":30605.0,"breite":48.200709877,"laenge":11.600386482,"hoehe_m":0.0,"art":"fix","satelliten":31,"tempo_kmh":10.5,"kurs_grad":20,"kurs_gueltig":true,"quelle":"simulation","aufloesung_m":0.0001,"ntr":null},"abfahrer":{"zeit_s":30605.0,"breite":48.200783232,"laenge":11.600497999,"hoehe_m":0.0,"art":"fix","satelliten":31,"tempo_kmh":10.5,"kurs_grad":20.0,"kurs_gueltig":true,"quelle":"simulation","aufloesung_m":0.0001,"ntr":null},"vektor":{"zeit_s":30605.0,"nord_m":8.157,"ost_m":8.29,"hoch_m":0.0,"abstand_m":11.63,"laengs_m":10.5,"quer_m":5.0,"seite":"rechts","art":"fix","unsicherheit_m":0.02,"paarung":"exakt","bezug":"eigene_position","paarungsfehler_s":0.0,"alter_s":0.24,"kurs_alter_s":0.0,"genau_genug":true,"kurs_haecksler_grad":20.0},"funk":{"verbunden":true,"gegenstelle":"127.0.0.1:35791","steht_seit_s":28.8,"abrisse":0,"ausfallzeit_s":0.0,"laengster_ausfall_s":0.0,"laufzeit_ms":44.0,"laufzeit_hoechst_ms":63.7,"rtcm_rahmen":0,"rtcm_bytes":0,"telemetrie_saetze":143,"telemetrie_ohne_anmeldung":0,"stumm_s":0.0},"empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0},"messung":{"zeilen":143,"fix_anteil":1.0,"fix_verloren":0,"laufzeit_min":0.5},"soll_seitenabstand_m":5.0,"veraltet_ab_s":2.0,"hinweis":"","konfig":{"haecksler":{"name":"Krone BiG X 650","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"auswurf_laengs_m":0.0,"auswurf_quer_m":0.0,"auswurf_hoch_m":0.0},"traktor":{"name":"","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"kupplung_laengs_m":0.0,"kupplung_hoch_m":0.0},"ladewagen":{"name":"","typ":"","volumen_m3":0.0,"kupplung_zu_letzter_achse_m":0.0,"ladeflaeche_anfang_m":0.0,"ladeflaeche_laenge_m":0.0,"ladeflaeche_breite_m":0.0,"inhalt_tonnen_bei_voll":0.0},"fassung":1,"geaendert":0.0,"vermessen_am":"","gespannlaenge_m":0.0,"offen":["Kein Messdatum eingetragen — die Maße gelten als ungemessen","Traktor: Bezeichnung fehlt","Traktor: Achsabstand fehlt","Traktor: Antennenposition fehlt","Traktor: Deichselkupplung bis Hinterachse fehlt","Ladewagen: Bezeichnung fehlt","Ladewagen: Volumen fehlt","Ladewagen: Kupplung bis letzte Achse fehlt"],"vollstaendig":false,"rolle":"abfahrer"},"system":{"zeit":1793176204.5122561,"laufzeit_s":28.0,"last_1min":0.0,"temperatur_c":null,"speicher_frei_mb":7475.6,"platte_frei_mb":30148.0,"drosselung":null,"wlan":{"schnittstelle":"","treiber":"","modus":"","link":null,"pegel_dbm":null,"rauschen_dbm":null,"ssid":"","bitrate_mbit":null,"kanal":null,"stationen":0,"tx_wiederholt":null,"tx_fehlgeschlagen":null,"inaktiv_ms":null,"stationsliste":[],"abstand_db":null},"netz":{"rx_bytes":null,"tx_bytes":null,"rx_fehler":null,"tx_fehler":null,"rx_verworfen":null,"tx_verworfen":null},"zeilen":29},"gegen_empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0},"kette":{"kette":"HX-YNEZLU","haecksler":{"uuid":"ec0d96ce-c847-433e-9da5-eec79da973d1","rolle":"haecksler","name":"SIM Häcksler","traktortyp":"","ladewagentyp":"","haecksertyp":"","erstellt":1793176176.4937158,"erstellt_auf":"","laeuft_auf":"","frueher":[],"fassung":1,"kennung":"HX-YNEZLU","anzeigename":"SIM Häcksler","gespann":"","geklont":false,"offen":["Häckslertyp fehlt"]},"angemeldet":1,"bekannt":1,"aktiv":"AB-KPM3MF","aktiv_uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","naechster":"","festgehalten":"","freie_annahme":true,"verworfen_ohne_anmeldung":0,"liste":[{"uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","kennung":"AB-KPM3MF","name":"SIM Abfahrer","gespann":"","platz":1,"zustand":"dran","dran":true,"naechster":false,"neu":true,"protokoll":1,"anmeldungen":1,"verbunden":true,"abstand_m":11.63,"laengs_m":10.5,"quer_m":5.0,"guete":"fix","unsicherheit_m":0.02,"lage_alter_s":0.0,"dran_seit_s":28.3,"laufzeit_ms":0.6,"stumm_s":0.0,"abrisse":0,"seit_s":28.6,"letzte_sicht_vor_s":0.0,"vermessen_am":"","empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0}}]},"kennung":{"uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","rolle":"abfahrer","name":"SIM Abfahrer","traktortyp":"","ladewagentyp":"","haecksertyp":"","erstellt":1793176176.4950407,"erstellt_auf":"","laeuft_auf":"","frueher":[],"fassung":1,"kennung":"AB-KPM3MF","anzeigename":"SIM Abfahrer","gespann":"","geklont":false,"offen":["Traktortyp fehlt","Ladewagentyp fehlt"]},"anmeldung":{"angenommen":true,"protokoll":1,"kette":"HX-YNEZLU","haecksler_name":"SIM Häcksler","haecksler_kennung":"HX-YNEZLU","kennung":"AB-KPM3MF","platz":1,"neu":true,"anmeldungen":1,"angemeldet_insgesamt":1,"zeit":1793176176.5156946,"angemeldet":true},"gegenprobe":{"vorhanden":false},"server_zeit":1793176205.0944521,"ich":{"uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","kennung":"AB-KPM3MF","name":"SIM Abfahrer","gespann":"","platz":1,"zustand":"dran","dran":true,"naechster":false,"neu":true,"protokoll":1,"anmeldungen":1,"verbunden":true,"abstand_m":11.63,"laengs_m":10.5,"quer_m":5.0,"guete":"fix","unsicherheit_m":0.02,"lage_alter_s":0.0,"dran_seit_s":28.3,"laufzeit_ms":0.6,"stumm_s":0.0,"abrisse":0,"seit_s":28.6,"letzte_sicht_vor_s":0.0,"vermessen_am":"","empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0},"von_insgesamt":1,"vor_mir":[]},"bild_alter_s":0.24},"abfahrer_kennung":{"uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","rolle":"abfahrer","name":"SIM Abfahrer","traktortyp":"","ladewagentyp":"","haecksertyp":"","erstellt":1793176176.4950407,"erstellt_auf":"","laeuft_auf":"","frueher":[],"fassung":1,"kennung":"AB-KPM3MF","anzeigename":"SIM Abfahrer","gespann":"","geklont":false,"offen":["Traktortyp fehlt","Ladewagentyp fehlt"]},"abfahrer_konfig":{"haecksler":{"name":"Krone BiG X 650","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"auswurf_laengs_m":0.0,"auswurf_quer_m":0.0,"auswurf_hoch_m":0.0},"traktor":{"name":"","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"kupplung_laengs_m":0.0,"kupplung_hoch_m":0.0},"ladewagen":{"name":"","typ":"","volumen_m3":0.0,"kupplung_zu_letzter_achse_m":0.0,"ladeflaeche_anfang_m":0.0,"ladeflaeche_laenge_m":0.0,"ladeflaeche_breite_m":0.0,"inhalt_tonnen_bei_voll":0.0},"fassung":1,"geaendert":0.0,"vermessen_am":"","gespannlaenge_m":0.0,"offen":["Kein Messdatum eingetragen — die Maße gelten als ungemessen","Traktor: Bezeichnung fehlt","Traktor: Achsabstand fehlt","Traktor: Antennenposition fehlt","Traktor: Deichselkupplung bis Hinterachse fehlt","Ladewagen: Bezeichnung fehlt","Ladewagen: Volumen fehlt","Ladewagen: Kupplung bis letzte Achse fehlt"],"vollstaendig":false,"rolle":"abfahrer"},"abfahrer_testtag":{"rolle":"abfahrer","datum":"2026-10-28","pruefliste":{"punkte":[{"id":"tests","gruppe":"Vorher","titel":"Prüfungen am Schreibtisch grün","wink":"test_basislinie.py, test_betrieb.py, test_testtag.py — alle bestanden","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"spiel","gruppe":"Vorher","titel":"Spielbetrieb: Anzeige lesbar, Abbruch erkannt","wink":"Strg-C am Pi → nach 2 s KEINE VERBINDUNG, keine stehende Zahl","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"befund","gruppe":"Empfänger","titel":"BEFUND.txt geprüft","wink":"Defekte unter 50 %, Auflösung ≤ 2 cm, mindestens 15 Satelliten","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"betriebsart","gruppe":"Empfänger","titel":"Betriebsart festgeschrieben","wink":"m21_diagnose.py --einrichten: Häcksler gibt RTCM aus, Abfahrer rechnet eine Position","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"antenne","gruppe":"Aufbau","titel":"Antenne frei und mit Abstand","wink":"freie Himmelssicht, mindestens 50 cm zur WLAN-Antenne","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"einrichten","gruppe":"Aufbau","titel":"einrichten.py pruefen ohne Befund","wink":"WLAN-Profile, Gerätenamen, Dienst — alles grün","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"tablet","gruppe":"Aufbau","titel":"Tablet im Kabinennetz","wink":"Anzeige unter http://192.168.60.1:8080, Bildschirm bleibt an","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"Tablet bekommt Daten"}},{"id":"masse","gruppe":"Aufbau","titel":"Fahrzeugmaße vermessen und eingetragen","wink":"MESSBLATT_ANTENNEN.md, eingegeben unter FAHRZEUGE","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":false,"text":"8 Maße offen"}},{"id":"funk","gruppe":"Hof","titel":"Funkstrecke steht","wink":"Laufzeit unter 120 ms, keine Abrisse im Stand","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"steht, 44 ms"}},{"id":"anmeldung","gruppe":"Hof","titel":"Abfahrer angemeldet","wink":"Name und Kennung stehen auf dem Häcksler-Tablet unter KETTE","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"angenommen"}},{"id":"fix","gruppe":"Hof","titel":"Beide auf RTK FIX","wink":"im Stand, 10 bis 20 m auseinander","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"FIX"}},{"id":"massband","gruppe":"Hof","titel":"Maßband-Probe bestanden","wink":"Abweichung höchstens 5 cm, im Stand, beide FIX","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":false,"text":"noch keine Probe"}},{"id":"stecker","gruppe":"Hof","titel":"Stecker gezogen, Rückkehr gemessen","wink":"Zeit vom Einstecken bis zur Anzeige als Notiz eintragen","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"feld","gruppe":"Feld","titel":"Feldfahrt aufgezeichnet","wink":"Aufzeichnung läuft, FIX-Anteil beobachtet","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"143 Zeilen, 100 % FIX"}},{"id":"ende","gruppe":"Abschluss","titel":"Sauber beendet, Daten gesichert","wink":"Programm beendet, Bericht vorhanden, Ordner messungen kopiert","erledigt":false,"zeit":"","notiz":"","system":null}],"erledigt":0,"gesamt":15},"proben":[],"statistik":{"n":0,"alle":0},"fenster":{"achsen":{"art":"achsen","n":20,"mittel_m":11.6297,"streuung_m":0.0,"min_m":11.6297,"max_m":11.6297,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02},"antennen":{"art":"antennen","n":20,"mittel_m":11.63,"streuung_m":0.0,"min_m":11.63,"max_m":11.63,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02},"laengs":{"art":"laengs","n":20,"mittel_m":10.5,"streuung_m":0.0,"min_m":10.5,"max_m":10.5,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02},"quer":{"art":"quer","n":20,"mittel_m":5.0,"streuung_m":0.0,"min_m":5.0,"max_m":5.0,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02}},"fenster_s":5.0,"messarten":{"achsen":"Hinterachse–Hinterachse","antennen":"Antenne–Antenne","laengs":"Längsversatz","quer":"Seitenabstand"},"bezug":{"achsen":"Antenne zu Antenne (Maße fehlen)","antennen":"Antenne zu Antenne, Lotpunkte am Boden","laengs":"Antenne zu Antenne (Maße fehlen)","quer":"Antenne zu Antenne (Maße fehlen)"},"grenzen":{"gut_m":0.05,"warn_m":0.15,"streuung_warn_m":0.03,"mindestens":10},"dateien":{"protokoll":"2026-10-28_0829_abfahrer_testtag.txt","ereignisse":"2026-10-28_0829_abfahrer_testtag.jsonl","bild":"2026-10-28_0829_abfahrer_hmi.jsonl"},"mitschrift_zeilen":29,"hmi_anzahl":0},"haecksler_daten":{"bereit":true,"rolle":"haecksler","haecksler":{"zeit_s":30605.0,"breite":48.200709877,"laenge":11.600386482,"hoehe_m":0.0,"art":"fix","satelliten":31,"tempo_kmh":10.5,"kurs_grad":20,"kurs_gueltig":true,"quelle":"simulation","aufloesung_m":0.0001,"ntr":null},"abfahrer":{"zeit_s":30605.0,"breite":48.200783232,"laenge":11.600497999,"hoehe_m":0.0,"art":"fix","satelliten":31,"tempo_kmh":10.5,"kurs_grad":20.0,"kurs_gueltig":true,"quelle":"simulation","aufloesung_m":0.0001,"ntr":null},"vektor":{"zeit_s":30605.0,"nord_m":8.157,"ost_m":8.29,"hoch_m":0.0,"abstand_m":11.63,"laengs_m":10.5,"quer_m":5.0,"seite":"rechts","art":"fix","unsicherheit_m":0.02,"paarung":"exakt","bezug":"eigene_position","paarungsfehler_s":0.0,"alter_s":0.19,"kurs_alter_s":0.0,"genau_genug":true,"kurs_haecksler_grad":20.0},"funk":{"verbunden":true,"gegenstelle":"SIM Abfahrer","steht_seit_s":28.8,"abrisse":0,"ausfallzeit_s":0.0,"laengster_ausfall_s":0.0,"laufzeit_ms":0.3,"laufzeit_hoechst_ms":3.6,"rtcm_rahmen":0,"rtcm_bytes":0,"telemetrie_saetze":144,"telemetrie_ohne_anmeldung":0,"stumm_s":0.0,"anzahl":1,"aktiv":"904e24b6-d46f-481f-8752-01a55ded81bd","teilnehmer":[{"uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","kennung":"AB-KPM3MF","name":"SIM Abfahrer","gespann":"","platz":1,"adresse":"127.0.0.1:45622","protokoll":1,"angemeldet":true,"neu":true,"abgewiesen":"","seit_s":28.8,"funk":{"verbunden":true,"gegenstelle":"127.0.0.1:45622","steht_seit_s":28.8,"abrisse":0,"ausfallzeit_s":0.0,"laengster_ausfall_s":0.0,"laufzeit_ms":0.3,"laufzeit_hoechst_ms":3.6,"rtcm_rahmen":0,"rtcm_bytes":0,"telemetrie_saetze":144,"telemetrie_ohne_anmeldung":0,"stumm_s":0.0}}]},"empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0},"messung":{"zeilen":143,"fix_anteil":1.0,"fix_verloren":0,"laufzeit_min":0.5},"soll_seitenabstand_m":5.0,"veraltet_ab_s":2.0,"hinweis":"","konfig":{"haecksler":{"name":"Krone BiG X 650","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"auswurf_laengs_m":0.0,"auswurf_quer_m":0.0,"auswurf_hoch_m":0.0},"traktor":{"name":"","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"kupplung_laengs_m":0.0,"kupplung_hoch_m":0.0},"ladewagen":{"name":"","typ":"","volumen_m3":0.0,"kupplung_zu_letzter_achse_m":0.0,"ladeflaeche_anfang_m":0.0,"ladeflaeche_laenge_m":0.0,"ladeflaeche_breite_m":0.0,"inhalt_tonnen_bei_voll":0.0},"fassung":1,"geaendert":0.0,"vermessen_am":"","gespannlaenge_m":0.0,"offen":["Kein Messdatum eingetragen — die Maße gelten als ungemessen","Häcksler: Achsabstand fehlt","Häcksler: Antennenposition fehlt","Häcksler: Auswurfpunkt fehlt"],"vollstaendig":false,"rolle":"haecksler"},"system":{"zeit":1793176204.5122218,"laufzeit_s":28.0,"last_1min":0.0,"temperatur_c":null,"speicher_frei_mb":7475.6,"platte_frei_mb":30148.0,"drosselung":null,"wlan":{"schnittstelle":"","treiber":"","modus":"","link":null,"pegel_dbm":null,"rauschen_dbm":null,"ssid":"","bitrate_mbit":null,"kanal":null,"stationen":0,"tx_wiederholt":null,"tx_fehlgeschlagen":null,"inaktiv_ms":null,"stationsliste":[],"abstand_db":null},"netz":{"rx_bytes":null,"tx_bytes":null,"rx_fehler":null,"tx_fehler":null,"rx_verworfen":null,"tx_verworfen":null},"zeilen":29},"gegen_empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0},"kette":{"kette":"HX-YNEZLU","haecksler":{"uuid":"ec0d96ce-c847-433e-9da5-eec79da973d1","rolle":"haecksler","name":"SIM Häcksler","traktortyp":"","ladewagentyp":"","haecksertyp":"","erstellt":1793176176.4937158,"erstellt_auf":"","laeuft_auf":"","frueher":[],"fassung":1,"kennung":"HX-YNEZLU","anzeigename":"SIM Häcksler","gespann":"","geklont":false,"offen":["Häckslertyp fehlt"]},"angemeldet":1,"bekannt":1,"aktiv":"AB-KPM3MF","aktiv_uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","naechster":"","festgehalten":"","freie_annahme":true,"verworfen_ohne_anmeldung":0,"liste":[{"uuid":"904e24b6-d46f-481f-8752-01a55ded81bd","kennung":"AB-KPM3MF","name":"SIM Abfahrer","gespann":"","platz":1,"zustand":"dran","dran":true,"naechster":false,"neu":true,"protokoll":1,"anmeldungen":1,"verbunden":true,"abstand_m":11.63,"laengs_m":10.5,"quer_m":5.0,"guete":"fix","unsicherheit_m":0.02,"lage_alter_s":0.2,"dran_seit_s":28.5,"laufzeit_ms":0.3,"stumm_s":0.0,"abrisse":0,"seit_s":28.8,"letzte_sicht_vor_s":0.2,"vermessen_am":"","empfaenger":{"verbunden":true,"port":"spielbetrieb","nmea":0,"novatel":0,"rtcm":0,"defekt":0,"stumm_s":0.0}}]},"kennung":{"uuid":"ec0d96ce-c847-433e-9da5-eec79da973d1","rolle":"haecksler","name":"SIM Häcksler","traktortyp":"","ladewagentyp":"","haecksertyp":"","erstellt":1793176176.4937158,"erstellt_auf":"","laeuft_auf":"","frueher":[],"fassung":1,"kennung":"HX-YNEZLU","anzeigename":"SIM Häcksler","gespann":"","geklont":false,"offen":["Häckslertyp fehlt"]},"anmeldung":{},"gegenprobe":{"vorhanden":false},"server_zeit":1793176205.0935924,"bild_alter_s":0.19},"haecksler_kennung":{"uuid":"ec0d96ce-c847-433e-9da5-eec79da973d1","rolle":"haecksler","name":"SIM Häcksler","traktortyp":"","ladewagentyp":"","haecksertyp":"","erstellt":1793176176.4937158,"erstellt_auf":"","laeuft_auf":"","frueher":[],"fassung":1,"kennung":"HX-YNEZLU","anzeigename":"SIM Häcksler","gespann":"","geklont":false,"offen":["Häckslertyp fehlt"]},"haecksler_konfig":{"haecksler":{"name":"Krone BiG X 650","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"auswurf_laengs_m":0.0,"auswurf_quer_m":0.0,"auswurf_hoch_m":0.0},"traktor":{"name":"","achsabstand_m":0.0,"antenne_laengs_m":0.0,"antenne_quer_m":0.0,"antenne_hoch_m":0.0,"kupplung_laengs_m":0.0,"kupplung_hoch_m":0.0},"ladewagen":{"name":"","typ":"","volumen_m3":0.0,"kupplung_zu_letzter_achse_m":0.0,"ladeflaeche_anfang_m":0.0,"ladeflaeche_laenge_m":0.0,"ladeflaeche_breite_m":0.0,"inhalt_tonnen_bei_voll":0.0},"fassung":1,"geaendert":0.0,"vermessen_am":"","gespannlaenge_m":0.0,"offen":["Kein Messdatum eingetragen — die Maße gelten als ungemessen","Häcksler: Achsabstand fehlt","Häcksler: Antennenposition fehlt","Häcksler: Auswurfpunkt fehlt"],"vollstaendig":false,"rolle":"haecksler"},"haecksler_testtag":{"rolle":"haecksler","datum":"2026-10-28","pruefliste":{"punkte":[{"id":"tests","gruppe":"Vorher","titel":"Prüfungen am Schreibtisch grün","wink":"test_basislinie.py, test_betrieb.py, test_testtag.py — alle bestanden","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"spiel","gruppe":"Vorher","titel":"Spielbetrieb: Anzeige lesbar, Abbruch erkannt","wink":"Strg-C am Pi → nach 2 s KEINE VERBINDUNG, keine stehende Zahl","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"befund","gruppe":"Empfänger","titel":"BEFUND.txt geprüft","wink":"Defekte unter 50 %, Auflösung ≤ 2 cm, mindestens 15 Satelliten","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"betriebsart","gruppe":"Empfänger","titel":"Betriebsart festgeschrieben","wink":"m21_diagnose.py --einrichten: Häcksler gibt RTCM aus, Abfahrer rechnet eine Position","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"antenne","gruppe":"Aufbau","titel":"Antenne frei und mit Abstand","wink":"freie Himmelssicht, mindestens 50 cm zur WLAN-Antenne","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"einrichten","gruppe":"Aufbau","titel":"einrichten.py pruefen ohne Befund","wink":"WLAN-Profile, Gerätenamen, Dienst — alles grün","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"tablet","gruppe":"Aufbau","titel":"Tablet im Kabinennetz","wink":"Anzeige unter http://192.168.60.1:8080, Bildschirm bleibt an","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"Tablet bekommt Daten"}},{"id":"masse","gruppe":"Aufbau","titel":"Fahrzeugmaße vermessen und eingetragen","wink":"MESSBLATT_ANTENNEN.md, eingegeben unter FAHRZEUGE","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":false,"text":"4 Maße offen"}},{"id":"funk","gruppe":"Hof","titel":"Funkstrecke steht","wink":"Laufzeit unter 120 ms, keine Abrisse im Stand","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"steht, 0 ms"}},{"id":"anmeldung","gruppe":"Hof","titel":"Abfahrer angemeldet","wink":"Name und Kennung stehen auf dem Häcksler-Tablet unter KETTE","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"1 angemeldet"}},{"id":"fix","gruppe":"Hof","titel":"Beide auf RTK FIX","wink":"im Stand, 10 bis 20 m auseinander","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"FIX"}},{"id":"massband","gruppe":"Hof","titel":"Maßband-Probe bestanden","wink":"Abweichung höchstens 5 cm, im Stand, beide FIX","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":false,"text":"noch keine Probe"}},{"id":"gegenprobe","gruppe":"Hof","titel":"Gegenprobe HEADINGA unter 2 cm","wink":"nur wenn der Rover HEADINGA liefert — sonst Notiz „nicht geliefert“","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":false,"text":"Rover liefert kein HEADINGA"}},{"id":"stecker","gruppe":"Hof","titel":"Stecker gezogen, Rückkehr gemessen","wink":"Zeit vom Einstecken bis zur Anzeige als Notiz eintragen","erledigt":false,"zeit":"","notiz":"","system":null},{"id":"feld","gruppe":"Feld","titel":"Feldfahrt aufgezeichnet","wink":"Aufzeichnung läuft, FIX-Anteil beobachtet","erledigt":false,"zeit":"","notiz":"","system":{"erfuellt":true,"text":"143 Zeilen, 100 % FIX"}},{"id":"ende","gruppe":"Abschluss","titel":"Sauber beendet, Daten gesichert","wink":"Programm beendet, Bericht vorhanden, Ordner messungen kopiert","erledigt":false,"zeit":"","notiz":"","system":null}],"erledigt":0,"gesamt":16},"proben":[],"statistik":{"n":0,"alle":0},"fenster":{"achsen":{"art":"achsen","n":20,"mittel_m":11.6297,"streuung_m":0.0,"min_m":11.6297,"max_m":11.6297,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02},"antennen":{"art":"antennen","n":20,"mittel_m":11.63,"streuung_m":0.0,"min_m":11.63,"max_m":11.63,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02},"laengs":{"art":"laengs","n":20,"mittel_m":10.5,"streuung_m":0.0,"min_m":10.5,"max_m":10.5,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02},"quer":{"art":"quer","n":20,"mittel_m":5.0,"streuung_m":0.0,"min_m":5.0,"max_m":5.0,"guete":"fix","nur_fix":true,"unsicherheit_m":0.02}},"fenster_s":5.0,"messarten":{"achsen":"Hinterachse–Hinterachse","antennen":"Antenne–Antenne","laengs":"Längsversatz","quer":"Seitenabstand"},"bezug":{"achsen":"Antenne zu Antenne (Maße fehlen)","antennen":"Antenne zu Antenne, Lotpunkte am Boden","laengs":"Antenne zu Antenne (Maße fehlen)","quer":"Antenne zu Antenne (Maße fehlen)"},"grenzen":{"gut_m":0.05,"warn_m":0.15,"streuung_warn_m":0.03,"mindestens":10},"dateien":{"protokoll":"2026-10-28_0829_haecksler_testtag.txt","ereignisse":"2026-10-28_0829_haecksler_testtag.jsonl","bild":"2026-10-28_0829_haecksler_hmi.jsonl"},"mitschrift_zeilen":29,"hmi_anzahl":0}};
+function kopie(o){return JSON.parse(JSON.stringify(o))}
+try{window.localStorage.removeItem("vyrel_knoten")}catch(e){}
+
+var HOME=[47.61640,10.49210],MX=111320*Math.cos(HOME[0]*Math.PI/180),MY=111132;
+var T0=Date.now()/1000;
+var ABF=[{uuid:"904e24b6-d46f-481f-8752-01a55ded81bd",kennung:"AB-X4ZGML",name:"Fendt 724 + Jumbo 8000",gespann:"Fendt 724 · Pöttinger Jumbo"},
+         {uuid:"6c1f0b9e-3a77-4d0a-9d8e-2b51c7a0e3f4",kennung:"AB-Q7R2KD",name:"MF 7480 + Cargos",gespann:"MF 7480 · Claas Cargos 8400"}];
+var HAE={uuid:"ec0d96ce-c847-433e-9da5-eec79da973d1",kennung:"HX-YNEZLU",name:"Krone BiG X 650"};
+
+/* Beispielmaße — so, wie sie nach dem Vermessen am Hof eingetragen sind. */
+var KONFIG={
+  haecksler:{name:"Krone BiG X 650",achsabstand_m:3.4,antenne_laengs_m:1.85,antenne_quer_m:0,antenne_hoch_m:3.95,auswurf_laengs_m:2.6,auswurf_quer_m:0.9,auswurf_hoch_m:5.4},
+  traktor:{name:"Fendt 724 Vario",achsabstand_m:2.78,antenne_laengs_m:1.1,antenne_quer_m:0,antenne_hoch_m:3.05,kupplung_laengs_m:-1.32,kupplung_hoch_m:0.55},
+  ladewagen:{name:"Pöttinger Jumbo 8000",typ:"Ladewagen",volumen_m3:46,kupplung_zu_letzter_achse_m:6.9,ladeflaeche_anfang_m:1.2,ladeflaeche_laenge_m:8.6,ladeflaeche_breite_m:2.45,inhalt_tonnen_bei_voll:14},
+  fassung:3,geaendert:T0-86400*2,vermessen_am:"2026-10-26",gespannlaenge_m:14.9,offen:[],vollstaendig:true,rolle:ROLLE};
+
+/* Häcksler fährt Bahnen (Nordnordost/Südsüdwest), 9 m Abstand, 320 m lang. */
+var LANG=320,BAHN=9,KMH=8.2,WENDE=18;
+function haeckslerLage(t){
+  var v=KMH/3.6,s=(t-T0+40)*v,stueck=LANG+WENDE,n=Math.floor(s/stueck),r=s-n*stueck,w=25*Math.PI/180;
+  var hin=n%2===0,x,y,kurs,kmh=KMH+Math.sin(t/7)*0.35;
+  var quer=(n%14)*BAHN;
+  if(r<LANG){var l=hin?r:LANG-r;x=l;y=quer;kurs=hin?25:205}
+  else{var f=(r-LANG)/WENDE,a=Math.PI*f;x=(hin?LANG:0)+(hin?1:-1)*Math.sin(a)*BAHN/2;y=quer+BAHN/2-Math.cos(a)*BAHN/2;kurs=(hin?25+180*f:205+180*f)%360;kmh=4.5}
+  var e=x*Math.sin(w)+y*Math.cos(w),nn=x*Math.cos(w)-y*Math.sin(w);
+  return {lat:HOME[0]+nn/MY,lon:HOME[1]+e/MX,kurs:kurs,kmh:kmh}}
+function rund(x,n){var f=Math.pow(10,n);return Math.round(x*f)/f}
+
+function bild(){
+  var t=Date.now()/1000,runde=Math.floor((t-T0+25)/300),u=(t-T0+25)%300;
+  var h=haeckslerLage(t),wer=ROLLE==="abfahrer"?ABF[0]:ABF[runde%2],ander=ROLLE==="abfahrer"?null:ABF[(runde+1)%2];
+  var phase=u<30?"kommt":u<200?"dran":u<230?"geht":"keiner";
+  var laengs,quer,kmhA,art="fix",unsicher=0.018+0.004*Math.sin(t/5);
+  if(phase==="kommt"){var f=u/30;laengs=-38+36*f*(2-f);quer=9.5-4.3*f;kmhA=h.kmh+5*(1-f)}
+  else if(phase==="dran"){laengs=0.45*Math.sin(t/11)+0.22*Math.sin(t/3.7)-0.15;quer=5.05+0.3*Math.sin(t/17)+0.08*Math.sin(t/2.3);kmhA=h.kmh+0.45*Math.cos(t/11)*1.5;
+    if(u>=120&&u<128){art="float";unsicher=0.21+0.05*Math.sin(t)}}
+  else if(phase==="geht"){var g=(u-200)/30;laengs=-2-40*g*g;quer=5.2+7*g;kmhA=Math.max(2,h.kmh-6*g)}
+  else{laengs=-120;quer=40;kmhA=24}
+  var d=kopie(V[ROLLE+"_daten"]),zeit=((t+3600)%86400);
+  var w=h.kurs*Math.PI/180,nord=laengs*Math.cos(w)-quer*Math.sin(w),ost=laengs*Math.sin(w)+quer*Math.cos(w);
+  var aLat=h.lat+nord/MY,aLon=h.lon+ost/MX,keiner=phase==="keiner"&&ROLLE==="haecksler";
+  d.haecksler=Object.assign(d.haecksler,{zeit_s:rund(zeit,1),breite:rund(h.lat,9),laenge:rund(h.lon,9),art:"fix",satelliten:29+Math.round(Math.sin(t/60)*2),tempo_kmh:rund(h.kmh,1),kurs_grad:Math.round(h.kurs),kurs_gueltig:h.kmh>2,quelle:"vorfuehrung",hoehe_m:512.4});
+  d.abfahrer=Object.assign(d.abfahrer,{zeit_s:rund(zeit,1),breite:rund(aLat,9),laenge:rund(aLon,9),art:art,satelliten:27+Math.round(Math.cos(t/50)*2),tempo_kmh:rund(kmhA,1),kurs_grad:Math.round(h.kurs+(phase==="dran"?0:phase==="kommt"?-6:12)),kurs_gueltig:true,quelle:"vorfuehrung",hoehe_m:512.1});
+  var abst=Math.hypot(laengs,quer);
+  d.vektor=keiner?null:Object.assign(d.vektor,{zeit_s:rund(zeit,1),nord_m:rund(nord,3),ost_m:rund(ost,3),hoch_m:-0.3,abstand_m:rund(abst,2),laengs_m:rund(laengs,3),quer_m:rund(quer,3),
+    seite:quer>0?"rechts":"links",art:art,unsicherheit_m:rund(unsicher,3),genau_genug:unsicher<0.1,alter_s:rund(0.15+0.1*Math.random(),2),kurs_alter_s:0,kurs_haecksler_grad:Math.round(h.kurs)});
+  d.hinweis=keiner?"Kein Abfahrer dran — "+ander.name+" ist auf dem Weg":"";
+  d.soll_seitenabstand_m=5.0;
+  var lauf=t-T0+1260;
+  d.messung={zeilen:Math.round(lauf*10),fix_anteil:0.987,fix_verloren:3,laufzeit_min:rund(lauf/60,1)};
+  d.system=Object.assign(d.system,{zeit:t,laufzeit_s:Math.round(lauf),last_1min:0.42,temperatur_c:rund(51+3*Math.sin(t/90),1)});
+  d.server_zeit=t;d.bild_alter_s=0.18;
+  d.konfig=kopie(KONFIG);
+  /* Kennungen */
+  var ken=kopie(V[ROLLE+"_kennung"]);
+  if(ROLLE==="haecksler")Object.assign(ken,{uuid:HAE.uuid,kennung:HAE.kennung,name:HAE.name,anzeigename:HAE.name,haecksertyp:"Krone BiG X 650",offen:[]});
+  else Object.assign(ken,{uuid:ABF[0].uuid,kennung:ABF[0].kennung,name:ABF[0].name,anzeigename:ABF[0].name,gespann:ABF[0].gespann,traktortyp:"Fendt 724 Vario",ladewagentyp:"Pöttinger Jumbo 8000",offen:[]});
+  d.kennung=ken;
+  /* Kette */
+  var k=d.kette,hk=Object.assign(k.haecksler,{uuid:HAE.uuid,kennung:HAE.kennung,name:HAE.name,anzeigename:HAE.name,haecksertyp:"Krone BiG X 650",offen:[]});
+  k.kette=HAE.kennung;k.haecksler=hk;
+  var zeilen=[],vorlage=k.liste[0];
+  var liste=ROLLE==="abfahrer"?[ABF[0],ABF[1]]:[wer,ander];
+  liste.forEach(function(a,i){var z=kopie(vorlage),istWer=a===wer,dran=istWer&&(phase==="dran"||phase==="kommt"||(phase==="geht"&&u<210));
+    if(ROLLE==="abfahrer"&&i===1){dran=false}
+    Object.assign(z,{uuid:a.uuid,kennung:a.kennung,name:a.name,gespann:a.gespann,platz:i+1,neu:false,anmeldungen:3+i,verbunden:true,
+      zustand:dran?"dran":(istWer&&phase!=="keiner")?"weg":(!istWer&&phase==="keiner")||(istWer&&phase==="keiner"&&ROLLE==="abfahrer")?"naechster":"wartet",
+      dran:dran,naechster:!dran&&((!istWer&&(phase==="keiner"||phase==="geht"))),
+      abstand_m:dran?rund(abst,2):rund(380+120*Math.sin(t/40+i),1),laengs_m:dran?rund(laengs,2):null,quer_m:dran?rund(quer,2):null,guete:dran?art:"fix",
+      unsicherheit_m:rund(unsicher,3),lage_alter_s:0.2,dran_seit_s:dran?Math.max(0,u):0,laufzeit_ms:rund(18+12*Math.random(),1),stumm_s:0,abrisse:i,seit_s:Math.round(lauf),letzte_sicht_vor_s:0.2,vermessen_am:"2026-10-26"});
+    zeilen.push(z)});
+  k.liste=zeilen;k.angemeldet=2;k.bekannt=2;
+  var aktiv=zeilen.filter(function(z){return z.dran})[0];
+  k.aktiv=aktiv?aktiv.kennung:"";k.aktiv_uuid=aktiv?aktiv.uuid:"";k.naechster=(zeilen.filter(function(z){return z.naechster})[0]||{}).kennung||"";
+  if(FEST)k.festgehalten=FEST;
+  /* Funk */
+  if(ROLLE==="haecksler"){d.funk.gegenstelle=wer.name;d.funk.anzahl=2;d.funk.aktiv=aktiv?aktiv.uuid:"";d.funk.laufzeit_ms=rund(20+8*Math.random(),1);d.funk.steht_seit_s=Math.round(lauf);
+    var tv=d.funk.teilnehmer[0];d.funk.teilnehmer=zeilen.map(function(z){var x=kopie(tv);Object.assign(x,{uuid:z.uuid,kennung:z.kennung,name:z.name,gespann:z.gespann,platz:z.platz,neu:false,seit_s:Math.round(lauf)});return x})}
+  else{d.funk.gegenstelle="192.168.50.1:5015";d.funk.laufzeit_ms=rund(24+10*Math.random(),1);d.funk.steht_seit_s=Math.round(lauf);
+    d.ich=zeilen[0];d.anmeldung=Object.assign(d.anmeldung||{},{angenommen:true,kette:HAE.kennung,haecksler_name:HAE.name,haecksler_kennung:HAE.kennung,kennung:ABF[0].kennung,platz:1,neu:false,angemeldet:true,zeit:T0-1260})}
+  return d}
+
+var FEST="";
+function antwort(obj,status){return Promise.resolve(new Response(JSON.stringify(obj),{status:status||200,headers:{"Content-Type":"application/json"}}))}
+var echt=window.fetch?window.fetch.bind(window):null;
+var TT=null;
+function testtag(){if(!TT){TT=kopie(V[ROLLE+"_testtag"]);var h=new Date();TT.datum=h.getFullYear()+"-"+("0"+(h.getMonth()+1)).slice(-2)+"-"+("0"+h.getDate()).slice(-2);
+  (TT.pruefliste&&TT.pruefliste.punkte||[]).forEach(function(p,i){if(i<6){p.erledigt=true;p.zeit="07:"+(10+i*4)}if(p.id==="masse")p.system={erfuellt:true,text:"alle Maße eingetragen"}})}
+  if(TT.pruefliste){var pk=TT.pruefliste.punkte||[];TT.pruefliste.erledigt=pk.filter(function(p){return p.erledigt}).length;TT.pruefliste.gesamt=pk.length}return TT}
+window.fetch=function(adresse,o){
+  var pfad=String(adresse||"").replace(/^https?:\/\/[^/]+/,"").split("?")[0],m=((o&&o.method)||"GET").toUpperCase(),daten=null;
+  try{daten=o&&o.body?JSON.parse(o.body):null}catch(e){}
+  if(pfad==="/daten")return antwort(bild());
+  if(pfad==="/hmi")return antwort({ok:true});
+  if(pfad==="/konfig"){if(m==="POST"&&daten){["haecksler","traktor","ladewagen"].forEach(function(b){if(daten[b])Object.keys(daten[b]).forEach(function(k){var v=daten[b][k];KONFIG[b][k]=typeof KONFIG[b][k]==="number"?Number(String(v).replace(",","."))||0:v})});
+      if(daten.vermessen_am!=null)KONFIG.vermessen_am=daten.vermessen_am;KONFIG.fassung++;KONFIG.geaendert=Date.now()/1000}
+    return antwort(kopie(KONFIG))}
+  if(pfad==="/kennung"){var k=bild().kennung;if(m==="POST"&&daten)Object.assign(k,daten);return antwort(k)}
+  if(pfad==="/kette"){if(m==="POST"&&daten)FEST=daten.aktiv||"";return antwort(bild().kette)}
+  if(pfad==="/testtag")return antwort(testtag());
+  if(pfad==="/pruefpunkt"){var tt=testtag();(tt.pruefliste.punkte||[]).forEach(function(p){if(p.id===daten.id){p.erledigt=!!daten.erledigt;p.notiz=daten.notiz||p.notiz;var d=new Date();p.zeit=p.erledigt?("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2):""}});return antwort(testtag())}
+  if(pfad==="/massband"){var v=bild().vektor,gm=Number(String(daten&&daten.gemessen_m||"").replace(",","."));
+    if(!isFinite(gm)||!gm)return antwort({fehler:"Wert nicht lesbar"},400);
+    var tt2=testtag(),rtk=v?Math.abs(daten.art==="laengs"?v.laengs_m:daten.art==="quer"?v.quer_m:v.abstand_m):null,ab=rtk==null?null:rund(rtk-gm,3);
+    tt2.probe={art:daten.art,gemessen_m:gm,rtk_m:rtk==null?null:rund(rtk,3),abweichung_m:ab,bewertung:ab==null?"fehlt":Math.abs(ab)<0.05?"gut":Math.abs(ab)<0.15?"warn":"schlecht"};
+    tt2.proben=(tt2.proben||[]).concat([tt2.probe]);return antwort(tt2)}
+  if(echt)return echt(adresse,o);
+  return Promise.reject(new Error("offline"));
+};
+window.VYREL_DEMO_BILD=bild;
+})();
+
+</script>
+</head>
+<body>
+<div id="geraet"></div>
+<div id="sperre" hidden></div>
+
+<script>
+/* ===========================================================================
+   Zeichen — dieselben Strich- und Flächensymbole wie in der Vorführung
+   =========================================================================== */
+var SYM={
+ feldkarte:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linejoin="round"><path d="M6 31l6-22h16l6 22z"/><path d="M15 31l3-22M25 31l-3-22M9 20h22"/></svg>',
+ ort:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a7 7 0 00-7 7c0 5 7 13 7 13s7-8 7-13a7 7 0 00-7-7zm0 9.5A2.5 2.5 0 1112 6.5a2.5 2.5 0 010 5z"/></svg>',
+ person:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6z"/></svg>',
+ block:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 3h6v3H9z" fill="currentColor"/><path d="M8.5 10h7M8.5 13.5h7M8.5 17h4" stroke-linecap="round"/></svg>',
+ tacho:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 12l4.5-3.5" stroke-linecap="round"/></svg>',
+ kurve:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 19c0-8 5-13 11-13"/><path d="M12 3l3.5 3-3.5 3" stroke-linejoin="round"/></svg>',
+ reihe:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 5v14M20 5v14M4 12h16"/></svg>',
+ gps:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg>',
+ funk:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="14" width="3" height="7" rx="1"/><rect x="8" y="10" width="3" height="11" rx="1"/><rect x="13" y="6" width="3" height="15" rx="1"/><rect x="18" y="3" width="3" height="18" rx="1"/></svg>',
+ schild:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 3v6c0 5-3.4 8-8 9-4.6-1-8-4-8-9V6z"/></svg>',
+ uhr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.4l3.4 2" stroke-linecap="round"/></svg>',
+ kreis:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>',
+ haken:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+ achtung:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9.5 17h-19z"/><path d="M12 10v4M12 17.2v.2"/></svg>',
+ chip:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="7" y="7" width="10" height="10" rx="1.5"/><path d="M10 3v4M14 3v4M10 17v4M14 17v4M3 10h4M3 14h4M17 10h4M17 14h4" stroke-linecap="round"/></svg>',
+ haecksler:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="9" y="13" width="21" height="17"/><path d="M13 13V9h13v4"/><path d="M30 19l8-6"/><circle cx="14" cy="33" r="3.2"/><circle cx="26" cy="33" r="3.2"/></svg>',
+ gespann:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="3" y="14" width="17" height="14"/><path d="M20 20h8l6 6v2H20z"/><circle cx="10" cy="32" r="3"/><circle cx="29" cy="32" r="3"/></svg>',
+ lineal:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="4" y="14" width="32" height="12" rx="2"/><path d="M11 14v5M18 14v7M25 14v5M32 14v7" stroke-linecap="round"/></svg>',
+ pult:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="5" y="8" width="30" height="20" rx="2"/><path d="M14 33h12M20 28v5" stroke-linecap="round"/><path d="M10 14h8M10 19h14" stroke-linecap="round"/></svg>',
+ kette:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1"><rect x="4" y="15" width="14" height="10" rx="5"/><rect x="22" y="15" width="14" height="10" rx="5"/><path d="M14 20h12"/></svg>',
+ band:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1"><circle cx="13" cy="20" r="9"/><circle cx="13" cy="20" r="3"/><path d="M13 29h24v-5" stroke-linecap="round"/><path d="M28 29v-3M33 29v-3" stroke-linecap="round"/></svg>',
+ liste:'<svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="5" width="26" height="31" rx="3"/><path d="M12 14l2.5 2.5L19 12M12 24l2.5 2.5L19 22M23 15h6M23 25h6"/></svg>'
+};
+</script>
+
+<script>
+/* ===========================================================================
+   Die Oberfläche
+   Aufbau einmal je Ansicht, danach nur noch Werte setzen. So bleiben
+   Eingabefelder unter den Fingern stehen, während die Messung weiterläuft.
+   =========================================================================== */
+(function(){
+"use strict";
+var geraet=document.getElementById("geraet");
+var root=document.documentElement;
+
+var UI={sicht:"fahren",tafel:0,schmal:null,messart:"achsen",bogenMax:20};
+var R={};                 // Elemente mit data-k
+var Daten=null;           // /daten
+var TT=null;              // /testtag
+var Konfig=null;          // /konfig, nur für FAHRZEUGE
+var Entwurf={};           // Eingaben der Fahrzeugseite, bis gespeichert wird
+var Meldung=null;         // {text, gut}
+var LetzterEmpfang=0;     // Uhr DIESES Tablets
+var Rolle="";             // "haecksler" | "abfahrer"
+var MB={letzte:null,fehler:"",sendet:false};
+/* Kopplung an EINEN Knoten. Beide Kabinennetze tragen dieselbe Adresse;
+   gerät das Tablet ins fremde Netz, antwortet unter derselben Adresse der
+   andere Pi. Die Seite merkt sich deshalb beim ersten Öffnen die UUID
+   ihres Knotens (localStorage gehört zur Adresse und überlebt so auch
+   den Wechsel) und sperrt sich, sobald eine andere antwortet. */
+var Kopplung=null;        // {uuid, kennung, rolle, name} des eigenen Knotens
+var Fremd=null;           // Kennungsblock des fremden Knotens, solange gesperrt
+/* ?entkoppeln löscht die gespeicherte Kopplung, z. B. nach einem Fehlgriff
+   im Simulator. Der Parameter wird gleich wieder aus der Adresse entfernt,
+   damit ein späteres Neuladen nicht erneut entkoppelt. */
+if(/[?&]entkoppeln(=|&|$)/.test(location.search)){
+  try{window.localStorage.removeItem("vyrel_knoten")}catch(e){}
+  try{history.replaceState(null,"",location.pathname)}catch(e){}
+}
+Kopplung=kopplungLaden();
+
+/* ----------------------------------------------------------- Kleinkram */
+function fmt(x,n){if(x==null||!isFinite(x))return "–";return Number(x).toFixed(n==null?1:n).replace(".",",")}
+function vz(x,n){if(x==null||!isFinite(x))return "–";var t=fmt(Math.abs(x),n);if(/^[0,]+$/.test(t))return t;return (x>=0?"+":"−")+t}
+function pad(n){return (n<10?"0":"")+n}
+function esc(t){return String(t==null?"":t).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+function oder(x,e){return (x===null||x===undefined||x==="")?(e===undefined?"–":e):x}
+function tag(){return root.classList.contains("tag")}
+function haeck(){return Rolle!=="abfahrer"}
+function speicher(k,v){try{if(v===undefined)return window.localStorage.getItem(k);window.localStorage.setItem(k,v)}catch(e){return null}}
+/* Die Schlüssel hießen bis 30.09.2026 franz_ton und franz_licht. Einmal
+   übernehmen, damit eine Wahl am Tablet den Namenswechsel übersteht. */
+function kopplungLaden(){try{var k=JSON.parse(speicher("vyrel_knoten")||"null");return k&&k.uuid?k:null}catch(e){return null}}
+function kopplungSetzen(k){Kopplung={uuid:k.uuid,kennung:k.kennung||"",rolle:k.rolle||"",name:k.anzeigename||k.name||""};speicher("vyrel_knoten",JSON.stringify(Kopplung))}
+/* Jede Eingabe trägt die Kennung des gekoppelten Knotens; ein fremder Pi lehnt sie mit 409 ab. */
+function kopf(){var h={"Content-Type":"application/json"};if(Kopplung)h["X-VYREL-Knoten"]=Kopplung.uuid;return h}
+function speicherAlt(neu,alt){var w=speicher(neu);if(w===null||w===undefined){w=speicher(alt);if(w!==null&&w!==undefined)speicher(neu,w)}return w}
+
+function set(k,v){var e=R[k];if(e&&e._t!==v){e.textContent=v;e._t=v}}
+function html(k,v){var e=R[k];if(e&&e._h!==v){e.innerHTML=v;e._h=v}}
+function cls(k,v){var e=R[k];if(e&&e.className!==v)e.className=v}
+function sty(k,p,v){var e=R[k];if(e&&e.style[p]!==v)e.style[p]=v}
+function versteckt(k,v){var e=R[k];if(e&&e.hidden!==v)e.hidden=v}
+
+function zeichen(z){return z==="gut"?SYM.haken:(z==="warn"||z==="fehlt")?"!":""}
+function listzeile(k,icon,name,extra){
+  return '<li class="listzeile'+(extra?" "+extra:"")+'"><span class="listicon">'+SYM[icon]+'</span><span class="listname" data-k="'+k+'_n">'+esc(name)+
+    '</span><span class="listwert" data-k="'+k+'_w"></span><span class="zeichen" data-k="'+k+'_z"></span></li>';
+}
+function zeile(k,wert,zust){set(k+"_w",String(wert));var e=R[k+"_z"];if(e&&e._z!==zust){e._z=zust;e.className="zeichen "+(zust||"");e.innerHTML=zeichen(zust)}}
+function wertzeile(k,name,einheit,extra){
+  return '<div class="wertzeile'+(extra?" "+extra:"")+'"><span class="wertname" data-k="'+k+'_n">'+name+'</span><span class="wertzahl" data-k="'+k+'"><span data-k="'+k+'_v">–</span>'+
+    (einheit?'<span class="einheit">'+einheit+'</span>':"")+'</span></div>';
+}
+function wert(k,v,klasse){set(k+"_v",v);cls(k,"wertzahl"+(klasse?" "+klasse:""))}
+
+/* --------------------------------------------------------- Ableitungen */
+function grenzeS(){return (Daten&&Daten.veraltet_ab_s)||2.0}
+/* Antwortet der Pi überhaupt noch? Ein abgestürzter Pi kann nicht melden,
+   dass seine Daten alt sind — das muss die Seite selbst merken. */
+function verbindungWeg(){return !LetzterEmpfang||(Date.now()-LetzterEmpfang)>grenzeS()*1000}
+function vektor(){return (Daten&&Daten.bereit&&Daten.vektor)||null}
+function veraltet(){if(verbindungWeg())return true;var v=vektor();if(!v)return true;return v.alter_s>grenzeS()}
+function frischerVektor(){return veraltet()?null:vektor()}
+/* Ohne Kurs lässt basislinie.py längs und quer auf 0,0 stehen. Eine Null,
+   die wie eine Messung aussieht, ist schlimmer als ein Strich. */
+function lageVektor(){var v=frischerVektor();return v&&v.kurs_haecksler_grad!=null?v:null}
+function guetezeichen(a){return a==="fix"?"gut":a==="float"?"warn":"fehlt"}
+function kette(){return (Daten&&Daten.kette)||{}}
+function kettenliste(){var k=kette();return (k.liste&&k.liste.length)?k.liste:[]}
+function ich(){return (Daten&&Daten.ich&&Object.keys(Daten.ich).length)?Daten.ich:null}
+function eigeneKennung(){return (Daten&&Daten.kennung)||{}}
+function anmeldung(){return (Daten&&Daten.anmeldung)||{}}
+function eigeneEpoche(){return Daten?(haeck()?Daten.haecksler:Daten.abfahrer):null}
+function fremdeEpoche(){return Daten?(haeck()?Daten.abfahrer:Daten.haecksler):null}
+function dranZeile(){return kettenliste().filter(function(z){return z.dran})[0]||null}
+function naechsterZeile(){return kettenliste().filter(function(z){return z.naechster})[0]||null}
+function konfigDaten(){return (Daten&&Daten.konfig)||{}}
+
+/* ================================================================ Aufbau */
+var TITEL={menue:"Menü",fahren:"Fahren",kette:"Kette",massband:"Maßband",pruefliste:"Prüfliste",fahrzeuge:"Fahrzeuge",system:"System"};
+
+function kopfHtml(){
+  return '<div class="kopf"><span class="rolle" data-k="k_rolle"></span><span class="schlag" data-k="k_ort"></span>'+
+    '<span class="rechts"><span class="stat" title="Funk"><span class="balken4" data-k="k_funk"><i></i><i></i><i></i><i></i></span></span>'+
+    '<span class="stat"><i class="punkt" data-k="k_rtkp"></i><span data-k="k_rtk">RTK</span></span>'+
+    '<span class="uhrzeit" data-k="k_uhr"></span>'+
+    '<button class="knopfklein" type="button" data-act="ton" data-k="k_ton"></button>'+
+    '<button class="knopfklein" type="button" data-act="licht" data-k="k_licht"></button></span></div>';
+}
+function bandHtml(){return '<div class="band" data-k="band"><span class="bandmarke" data-k="b_m"></span><span class="bandtext" data-k="b_t"></span><span class="bandzahl" data-k="b_z"></span></div><div class="alarm" data-k="alarm" hidden></div>'}
+function befehlHtml(){
+  return '<div class="befehl still" data-k="bef"><div class="pfeil"><span class="psym" data-k="bef_p"></span><span class="chev"><i></i><i></i><i></i></span></div><div style="min-width:0"><p class="bw" data-k="bef_w"></p><div class="bs" data-k="bef_s"></div></div>'+
+    '<div class="bz"><span data-k="bef_z"></span><small data-k="bef_zu"></small></div></div>';
+}
+function tastenHtml(t){
+  return '<div class="fuss">'+t.map(function(x){
+    var k="t_"+x.act+(x.arg||"");
+    return '<button type="button" class="taste'+(x.an?" an":"")+'" data-act="'+x.act+'"'+(x.arg?' data-arg="'+x.arg+'"':"")+' data-k="'+k+'">'+
+      '<span data-k="'+k+'_t">'+x.t+'</span><small data-k="'+k+'_u">'+(x.u||"")+'</small></button>';
+  }).join("")+'</div>';
+}
+function umschalterHtml(namen){
+  return '<div class="umschalter">'+namen.map(function(n,i){return '<button type="button" data-act="tafel" data-arg="'+i+'" class="'+(i===UI.tafel?"an":"")+'">'+n+'</button>'}).join("")+'</div>';
+}
+function flaecheHtml(tafeln){
+  if(!UI.schmal)return '<div class="flaeche" data-k="fl">'+tafeln.map(function(t){return t.html}).join("")+'</div>';
+  if(UI.tafel>=tafeln.length)UI.tafel=0;
+  return '<div class="flaeche" data-k="fl">'+(tafeln.length>1?umschalterHtml(tafeln.map(function(t){return t.name})):"")+tafeln[UI.tafel].html+'</div>';
+}
+var TASTEN_HAUPT=function(){return [
+  {act:"sicht",arg:"menue",t:"Menü",u:"Ansichten"},
+  {act:"sicht",arg:"fahren",t:"Fahren",u:"Messung",an:UI.sicht==="fahren"},
+  {act:"sicht",arg:"kette",t:"Kette",u:"",an:UI.sicht==="kette"},
+  {act:"sicht",arg:"massband",t:"Maßband",u:"Probe",an:UI.sicht==="massband"},
+  {act:"sicht",arg:"pruefliste",t:"Prüfliste",u:"",an:UI.sicht==="pruefliste"}
+]};
+
+/* ---------------------------------------------------- Tempo-Instrumente
+   Links das andere Fahrzeug, in der Mitte das eigene mit Bogen, rechts der
+   Seitenabstand. Auf dem Bogen zeigt die Messfarbe das andere Fahrzeug. */
+var BOGEN={cx:100,cy:108,r:88,von:205,bis:-25};
+function bogenPunkt(t,r){var a=(BOGEN.von+(BOGEN.bis-BOGEN.von)*Math.max(0,Math.min(1,t)))*Math.PI/180;return [BOGEN.cx+r*Math.cos(a),BOGEN.cy-r*Math.sin(a)]}
+function bogenPfad(t0,t1){
+  var p0=bogenPunkt(t0,BOGEN.r),p1=bogenPunkt(t1,BOGEN.r),gr=Math.abs(t1-t0)*230>180?1:0;
+  return "M"+p0[0].toFixed(1)+" "+p0[1].toFixed(1)+" A"+BOGEN.r+" "+BOGEN.r+" 0 "+gr+" 1 "+p1[0].toFixed(1)+" "+p1[1].toFixed(1);
+}
+function tempoHtml(){
+  return '<div class="tempo" data-k="tp">'+
+    '<div class="tinst"><div class="tm" data-k="tp_l1"></div><div class="tz"><span data-k="tp_1">–</span><small>km/h</small></div><div class="tu" data-k="tp_u1"></div></div>'+
+    '<div class="tinst ich"><svg viewBox="0 0 200 140" preserveAspectRatio="xMidYMid meet" aria-hidden="true">'+
+      '<path class="bogen-grund" stroke-width="7" d="'+bogenPfad(0,1)+'"/>'+
+      '<path class="bogen-wert" stroke-width="7" data-k="tp_arc" d=""/>'+
+      '<line class="bogen-h" stroke-width="5" data-k="tp_h"/></svg>'+
+      '<div class="tm" data-k="tp_l2"></div><div class="tz"><span data-k="tp_2">–</span><small>km/h</small></div><span class="delta" data-k="tp_d"></span></div>'+
+    '<div class="tinst gold"><div class="tm">Seitenabstand</div><div class="tz"><span data-k="tp_3">–</span><small>m</small></div><div class="tu" data-k="tp_u3"></div></div>'+
+  '</div>';
+}
+function strich(k,t){
+  var e=R[k];if(!e)return;
+  if(t==null){e.setAttribute("visibility","hidden");return}
+  var a=bogenPunkt(t,BOGEN.r-13),b=bogenPunkt(t,BOGEN.r+13);
+  e.setAttribute("visibility","visible");
+  e.setAttribute("x1",a[0].toFixed(1));e.setAttribute("y1",a[1].toFixed(1));e.setAttribute("x2",b[0].toFixed(1));e.setAttribute("y2",b[1].toFixed(1));
+}
+
+/* --------------------------------------------------------- Längslage */
+function lageHtml(){
+  return '<div class="lage" data-k="lg"><div class="lg-kopf"><span data-k="lg_m">Längslage</span><b data-k="lg_t"></b></div>'+
+    '<div class="lg-bahn" data-k="lg_bahn"><div data-k="lg_striche"></div><div class="lg-haecksler" data-k="lg_h"></div><div class="lg-null" data-k="lg_0"></div><div class="lg-ist aus" data-k="lg_i"></div></div>'+
+    '<div class="lg-skala" data-k="lg_s"></div></div>';
+}
+
+/* ================================================================ FAHREN */
+function fahren(){
+  var lage='<div class="tafel"><div class="marke" data-k="dr_m">Draufsicht · Fahrtrichtung Häcksler oben</div>'+
+    '<div class="leinwand"><canvas data-cv="draufsicht"></canvas><div class="lband"><span data-k="dr_b1"></span><span data-k="dr_b2"></span></div></div></div>';
+  var werte='<div class="tafel mitte"><div class="marke">Vektor Häcksler → Abfahrer</div><div class="werte">'+
+    wertzeile("fw_l","Längs","m")+wertzeile("fw_q","Quer","m")+wertzeile("fw_a","Abstand Antennen","m")+
+    wertzeile("fw_h","Höhe","m","nurhoch")+wertzeile("fw_u","Unsicherheit","cm")+wertzeile("fw_k","Kurs Häcksler","°","nurhoch")+
+    wertzeile("fw_s","Satelliten eigen","","nurhoch")+wertzeile("fw_p","Paarung","")+'</div></div>';
+  var zustand='<div class="tafel"><div class="marke">Zustand</div><ul class="liste">'+
+    listzeile("fz_rtk","gps","RTK")+listzeile("fz_ka","kurve","Kursalter","nurhoch")+listzeile("fz_gp","schild","Gegenprobe")+
+    listzeile("fz_funk","funk","Funk")+listzeile("fz_emp","chip","Empfänger","nurhoch")+listzeile("fz_alt","uhr","Datenalter")+'</ul>'+
+    '<div class="marke abst nurhoch">Aufzeichnung</div><ul class="liste nurhoch">'+
+    listzeile("fz_ze","block","Zeilen")+listzeile("fz_fx","kreis","FIX-Anteil")+listzeile("fz_fv","achtung","FIX verloren")+'</ul></div>';
+  var t=[{name:"Lage",html:lage},{name:"Werte",html:werte},{name:"Zustand",html:zustand}];
+  return befehlHtml()+tempoHtml()+lageHtml()+flaecheHtml(t)+tastenHtml(TASTEN_HAUPT());
+}
+
+function befehlFahren(){
+  var v=vektor();
+  if(verbindungWeg())return {f:"rot",p:"!",w:"KEINE VERBINDUNG",
+    s:LetzterEmpfang?"seit "+fmt((Date.now()-LetzterEmpfang)/1000,0)+" s keine Antwort vom Rechner":"Rechner noch nicht erreicht",z:"",zu:""};
+  if(!v)return {f:"rot",p:"–",w:"KEIN VEKTOR",s:(Daten&&Daten.hinweis)||"Warte auf beide Empfänger",z:"",zu:""};
+  if(veraltet())return {f:"rot",p:"!",w:"DATEN ZU ALT",s:fmt(v.alter_s)+" s ohne neue Messung — Zahlen ausgeblendet",z:"",zu:""};
+  if(v.kurs_haecksler_grad==null)return {f:"gelb",p:"~",w:"KEIN KURS",
+    s:"Längs und quer erst ab "+fmt(2,0)+" km/h · Antennen "+fmt(v.abstand_m,2)+" m auseinander · "+v.art.toUpperCase(),z:"–",zu:"m längs"};
+  var lg=Math.abs(v.laengs_m)<0.005?"auf gleicher Höhe":haeck()
+      ?("Abfahrer "+fmt(Math.abs(v.laengs_m),2)+" m "+(v.laengs_m>=0?"voraus":"zurück"))
+      :(fmt(Math.abs(v.laengs_m),2)+" m "+(v.laengs_m>=0?"vor":"hinter")+" dem Häcksler");
+  var qu=haeck()
+      ?(fmt(Math.abs(v.quer_m),2)+" m "+(v.quer_m>0?"rechts":"links"))
+      :("Häcksler "+fmt(Math.abs(v.quer_m),2)+" m "+(v.quer_m>0?"links":"rechts")+" von dir");
+  var s=lg+" · "+qu+" · ±"+fmt(v.unsicherheit_m*100,1)+" cm";
+  var b={p:"",z:vz(v.laengs_m,2),zu:"m längs",s:s};
+  if(v.art==="fix"&&v.genau_genug){b.f="gruen";b.w="RTK FIX";b.p="◆"}
+  else if(v.art==="fix"){b.f="gelb";b.w="FIX UNSICHER";b.p="~";b.s="Unsicherheit über 10 cm · "+s}
+  else if(v.art==="float"){b.f="gelb";b.w="NUR FLOAT";b.p="~";b.s="Dezimeter bis Meter · "+s}
+  else{b.f="rot";b.w="KEIN RTK";b.p="!";b.s="Meter-Genauigkeit · "+s}
+  return b;
+}
+/* Das Wort so groß wie möglich: erst voll setzen, dann an die Breite anpassen. */
+function befWort(w){
+  var e=R.bef_w;if(!e)return;
+  if(e._fit===w&&e.scrollWidth<=e.clientWidth+1)return;
+  e.textContent=w;e._t=w;e.style.setProperty("--f","1");
+  var sw=e.scrollWidth,cw=e.clientWidth;
+  var f=sw>cw&&cw>0?Math.max(.45,cw/sw*.97):1;
+  e.style.setProperty("--f",f.toFixed(3));e._fit=w;
+}
+function befSetzen(b){
+  cls("bef","befehl "+b.f);
+  set("bef_p",b.p||"");befWort(b.w);set("bef_s",b.s||"");set("bef_z",b.z||"");set("bef_zu",b.zu||"");
+}
+
+function fahrenAuf(){
+  var b=befehlFahren();befSetzen(b);
+  var v=lageVektor(),va=frischerVektor(),weg=verbindungWeg();
+  var eig=weg?null:eigeneEpoche();
+  /* Das fremde Tempo hängt am Funk, nicht am Vektor: Ohne FIX (oder ganz
+     ohne Vektor) fahren beide trotzdem, und das Tempo soll stehen. Nur
+     eine Position, die mehr als 3 s hinter der eigenen liegt, gilt als alt. */
+  var funkSteht=!weg&&!!(Daten&&Daten.funk&&Daten.funk.verbunden);
+  var fr=funkSteht?fremdeEpoche():null;
+  if(fr&&eig){var dz=Math.abs(eig.zeit_s-fr.zeit_s)%86400;if(Math.min(dz,86400-dz)>3)fr=null}
+
+  /* Tempo */
+  set("tp_l1",haeck()?"Abfahrer":"Häcksler");
+  set("tp_1",fr?fmt(fr.tempo_kmh):"–");
+  set("tp_u1",fr?(fr.kurs_gueltig?"Kurs "+fmt(fr.kurs_grad,0)+"°":"Kurs eingefroren"):(weg?"keine Daten":!funkSteht?"kein Funk":"keine Position"));
+  set("tp_l2",haeck()?"Häcksler · ich":"Mein Tempo");
+  var ichT=eig?eig.tempo_kmh:null;
+  set("tp_2",ichT==null?"–":fmt(ichT));
+  var max=UI.bogenMax;if(ichT!=null&&ichT>max*0.95)max=Math.ceil(ichT/10)*10+10;
+  var e=R.tp_arc;if(e){var t=ichT==null?0:ichT/max;var p=t>0.004?bogenPfad(0,t):"";if(e._d!==p){e.setAttribute("d",p);e._d=p}}
+  strich("tp_h",fr?fr.tempo_kmh/max:null);
+  if(ichT==null||!fr){sty("tp_d","visibility","hidden")}
+  else{
+    sty("tp_d","visibility","visible");
+    var d=ichT-fr.tempo_kmh,gleich=Math.abs(d)<0.15;
+    set("tp_d",gleich?"gleich schnell":(d>0?"▲ ":"▼ ")+fmt(Math.abs(d))+" km/h "+(d>0?"schneller":"langsamer"));
+    cls("tp_d","delta "+(gleich?"gut":d>0?"plus":"minus"));
+  }
+  var soll=Daten&&Daten.soll_seitenabstand_m;
+  set("tp_3",v?fmt(Math.abs(v.quer_m),2):"–");
+  set("tp_u3",v?(soll?"Soll "+fmt(soll,1)+" m · "+vz(Math.abs(v.quer_m)-soll,2)+" m":"")+(v.quer_m>0?" · rechts":" · links"):(soll?"Soll "+fmt(soll,1)+" m":""));
+  cls("tp","tempo"+(weg?" veraltet":""));
+
+  lageAuf(v);
+
+  /* Werte */
+  var nicht=v?"":"still";
+  wert("fw_l",v?vz(v.laengs_m,2):"–",v?"gold":"still");
+  set("fw_l_n",haeck()?"Längs · + = Abfahrer voraus":"Längs · + = ich vorn");
+  wert("fw_q",v?vz(v.quer_m,2):"–",nicht);set("fw_q_n",!v?"Quer":haeck()?"Quer · Abfahrer "+(v.quer_m>0?"rechts":"links"):"Quer · ich "+(v.quer_m>0?"rechts":"links")+" vom Häcksler");
+  wert("fw_a",va?fmt(va.abstand_m,2):"–",va?"":"still");
+  wert("fw_h",va?vz(va.hoch_m,2):"–",va?"":"still");
+  wert("fw_u",va?fmt(va.unsicherheit_m*100,1):"–",!va?"still":va.unsicherheit_m<0.10?"gruen":"gelb");
+  wert("fw_k",v&&v.kurs_haecksler_grad!=null?fmt(v.kurs_haecksler_grad,1):"–",nicht);
+  wert("fw_s",eig?String(eig.satelliten):"–",!eig?"still":eig.satelliten>=25?"":eig.satelliten>=15?"gelb":"rot");
+  wert("fw_p",va?va.paarung+(va.paarungsfehler_s?" · "+fmt(va.paarungsfehler_s*1000,0)+" ms":""):"–",!va?"still":va.paarung==="exakt"?"":"gelb");
+
+  /* Zustand. Veraltete Angaben bekommen keinen grünen Haken. */
+  var funk=weg?{}:((Daten&&Daten.funk)||{}), emp=weg?{}:((Daten&&Daten.empfaenger)||{}), m=(Daten&&Daten.messung)||{};
+  var gp=va&&Daten&&Daten.gegenprobe;
+  zeile("fz_rtk",va?va.art.toUpperCase()+" · ±"+fmt(va.unsicherheit_m*100,1)+" cm":"–",va?guetezeichen(va.art):"fehlt");
+  zeile("fz_ka",!va?"–":va.kurs_haecksler_grad==null?"kein Kurs":fmt(va.kurs_alter_s)+" s",!va||va.kurs_haecksler_grad==null?"fehlt":va.kurs_alter_s>20?"warn":"gut");
+  if(gp&&gp.vorhanden)zeile("fz_gp","±"+fmt(gp.abweichung_m*100)+" cm",gp.abweichung_m<=0.05?"gut":gp.abweichung_m<=0.15?"warn":"fehlt");
+  else zeile("fz_gp",haeck()?"kein HEADINGA":"nur am Häcksler","");
+  zeile("fz_funk",funk.verbunden?fmt(funk.laufzeit_ms)+" ms · "+oder(funk.abrisse,0)+" Abrisse":"weg",funk.verbunden?"gut":"fehlt");
+  zeile("fz_emp",emp.verbunden?oder(emp.port,"läuft"):"weg",emp.verbunden?"gut":"fehlt");
+  var roh=vektor();
+  zeile("fz_alt",weg?"Rechner antwortet nicht":roh?fmt(roh.alter_s)+" s":"–",veraltet()?"fehlt":"gut");
+  zeile("fz_ze",String(oder(m.zeilen,0))+" · "+fmt(m.laufzeit_min)+" min","gut");
+  zeile("fz_fx",Math.round((m.fix_anteil||0)*100)+" %",(m.fix_anteil||0)>=0.9?"gut":"warn");
+  zeile("fz_fv",String(oder(m.fix_verloren,0)),(m.fix_verloren||0)===0?"gut":"warn");
+
+  set("dr_b1",va?"Antennen "+fmt(va.abstand_m,2)+" m":(weg?"keine Verbindung":"kein aktueller Vektor"));
+  set("dr_b2",va?va.art.toUpperCase():"");
+}
+
+function lageAuf(v){
+  if(!R.lg)return;
+  var span=15;if(v)span=Math.max(15,Math.ceil((Math.abs(v.laengs_m)+3)/5)*5);
+  if(R.lg._span!==span){
+    R.lg._span=span;
+    var s=[];for(var m=-span;m<=span;m+=5){s.push('<span class="lg-strich" style="left:'+(50+50*m/span).toFixed(2)+'%"></span>')}
+    html("lg_striche",s.join(""));
+    html("lg_s",'<span style="left:0">−'+span+' m · zurück</span><span style="left:50%">Häcksler</span><span style="left:100%">+'+span+' m · voraus</span>');
+    var hl=3.8;sty("lg_h","left",(50-50*hl/span).toFixed(2)+"%");sty("lg_h","width",(100*hl/span).toFixed(2)+"%");
+    sty("lg_0","left","50%");
+  }
+  set("lg_m",haeck()?"Längslage · Abfahrer zum Häcksler":"Längslage · ich zum Häcksler");
+  if(!v){cls("lg_i","lg-ist aus");set("lg_t",verbindungWeg()?"keine Verbindung":frischerVektor()?"kein Kurs":"kein aktueller Vektor");return}
+  var x=50+50*Math.max(-1,Math.min(1,v.laengs_m/span));
+  var genau=v.art==="fix"&&v.genau_genug;
+  sty("lg_i","left",x.toFixed(2)+"%");
+  if(genau){sty("lg_i","width","");cls("lg_i","lg-ist")}
+  else{var bahn=R.lg_bahn?R.lg_bahn.clientWidth:300;var bpx=Math.max(24,Math.min(bahn*.5,bahn*(2*v.unsicherheit_m)/(2*span)));sty("lg_i","width",bpx.toFixed(0)+"px");cls("lg_i","lg-ist unscharf")}
+  set("lg_t",vz(v.laengs_m,2)+" m · "+(v.laengs_m>=0?"voraus":"zurück")+(genau?"":" · ungenau"));
+}
+
+/* ============================================================ Draufsicht */
+var LEIN=[];
+function groesse(c){
+  var r=c.getBoundingClientRect(),d=Math.min(2,window.devicePixelRatio||1);
+  var w=Math.max(10,Math.round(r.width*d)),h=Math.max(10,Math.round(r.height*d));
+  if(c.width!==w||c.height!==h){c.width=w;c.height=h}
+  return d;
+}
+function farbe(n){return getComputedStyle(root).getPropertyValue("--"+n).trim()}
+function rr(ctx,x,y,w,h,r){ctx.beginPath();if(ctx.roundRect)ctx.roundRect(x,y,w,h,r);else ctx.rect(x,y,w,h)}
+function zahlOder(x,e){return (typeof x==="number"&&isFinite(x)&&x!==0)?x:e}
+
+function zeichneDraufsicht(c){
+  var d=groesse(c),ctx=c.getContext("2d"),W=c.width,H=c.height;
+  var F={feld:farbe("feld"),raster:farbe("raster"),stark:farbe("raster-stark"),lead:farbe("lead"),leadT:farbe("lead-tief"),
+    gesp:farbe("gespann"),gespT:farbe("gespann-tief"),gold:farbe("gold"),text:farbe("text"),still:farbe("still"),mess:farbe("mess"),gelb:farbe("gelb"),rot:farbe("rot")};
+  ctx.fillStyle=F.feld;ctx.fillRect(0,0,W,H);
+  var v=lageVektor(),k=konfigDaten(),hk=k.haecksler||{},tr=k.traktor||{},lw=k.ladewagen||{};
+
+  /* Maße aus FAHRZEUGE, sonst übliche Werte. Bezug ist jeweils die Mitte
+     der Hinterachse — genau der Punkt, auf den der Vektor rechnet. */
+  var hAchs=zahlOder(hk.achsabstand_m,3.55), hVor=hAchs+2.6, hHinten=1.6, hBreit=3.0;
+  var tAchs=zahlOder(tr.achsabstand_m,2.9), tVor=tAchs+1.1, tHinten=0.9, tBreit=2.5;
+  var kupp=zahlOder(tr.kupplung_laengs_m,-1.35), wLang=zahlOder(lw.kupplung_zu_letzter_achse_m,7.6)+1.4, wBreit=2.55;
+
+  var hat=!!v, vq=hat?v.quer_m:0, vl=hat?v.laengs_m:0;
+  var qMin=-hBreit,qMax=hBreit,lMin=-hHinten-1,lMax=hVor+1;
+  if(hat){qMin=Math.min(qMin,vq-tBreit);qMax=Math.max(qMax,vq+tBreit);lMax=Math.max(lMax,vl+tVor);lMin=Math.min(lMin,vl+kupp-wLang)}
+  qMin-=1.5;qMax+=1.5;lMin-=1.5;lMax+=1.5;
+  var f=Math.min(W/(qMax-qMin),H/(lMax-lMin));
+  var mx=W/2-((qMin+qMax)/2)*f, my=H/2+((lMin+lMax)/2)*f;
+  function X(q){return mx+q*f}function Y(l){return my-l*f}
+
+  /* Raster: fein 1 m, kräftig 5 m — damit sich Meter schätzen lassen. */
+  var fein=f/d>=7;
+  for(var g=Math.floor(qMin);g<=Math.ceil(qMax);g++){if(!fein&&g%5)continue;ctx.strokeStyle=g%5?F.raster:F.stark;ctx.lineWidth=d;ctx.beginPath();ctx.moveTo(X(g),0);ctx.lineTo(X(g),H);ctx.stroke()}
+  for(var g2=Math.floor(lMin);g2<=Math.ceil(lMax);g2++){if(!fein&&g2%5)continue;ctx.strokeStyle=g2%5?F.raster:F.stark;ctx.lineWidth=d;ctx.beginPath();ctx.moveTo(0,Y(g2));ctx.lineTo(W,Y(g2));ctx.stroke()}
+
+  ctx.shadowColor="rgba(0,0,0,.45)";ctx.shadowBlur=12*d;ctx.shadowOffsetX=2*d;ctx.shadowOffsetY=4*d;
+  /* Häcksler, kühles Blaugrau */
+  ctx.fillStyle="#1a1d20";
+  [[-1.62,hAchs,.6,1.5],[1.02,hAchs,.6,1.5],[-1.45,0,.5,1.1],[.95,0,.5,1.1]].forEach(function(r){rr(ctx,X(r[0]),Y(r[1]+r[3]/2),r[2]*f,r[3]*f,.15*f);ctx.fill()});
+  ctx.fillStyle=F.leadT;rr(ctx,X(-hBreit),Y(hVor+.1),2*hBreit*f,1.4*f,.2*f);ctx.fill();
+  ctx.fillStyle=F.lead;rr(ctx,X(-1.3),Y(hVor-1.1),2.6*f,(hVor-1.1+hHinten)*f,.35*f);ctx.fill();
+  ctx.fillStyle="rgba(0,0,0,.28)";rr(ctx,X(-1.0),Y(hAchs+.2),2.0*f,1.5*f,.25*f);ctx.fill();
+  ctx.shadowColor="transparent";ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+  /* Hinterachse als Bezugspunkt */
+  ctx.strokeStyle=F.text;ctx.lineWidth=1.5*d;ctx.beginPath();ctx.moveTo(X(-.35),Y(0));ctx.lineTo(X(.35),Y(0));ctx.moveTo(X(0),Y(-.35));ctx.lineTo(X(0),Y(.35));ctx.stroke();
+  var schrift=getComputedStyle(root).getPropertyValue("--f-text");
+  function schild(text,x,y,rechts,farbeT){
+    /* Beschriftung mit halbdurchsichtigem Grund, innerhalb des Bildes gehalten. */
+    ctx.font="600 "+(12*d)+"px "+schrift;var w=ctx.measureText(text).width,h=16*d,pad=5*d;
+    var x0=rechts?x:x-w-2*pad;x0=Math.max(4*d,Math.min(W-w-2*pad-4*d,x0));
+    var y0=Math.max(56*d,Math.min(H-h-26*d,y-h/2));
+    ctx.fillStyle=tag()?"rgba(255,255,255,.82)":"rgba(6,9,13,.72)";rr(ctx,x0,y0,w+2*pad,h,5*d);ctx.fill();
+    ctx.fillStyle=farbeT||F.text;ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(text,x0+pad,y0+h/2+.5*d);
+  }
+
+  if(hat){
+    var genau=v.art==="fix"&&v.genau_genug, pf=genau?F.mess:v.art==="float"||v.art==="fix"?F.gelb:F.rot;
+    /* Verbindungslinie Hinterachse zu Hinterachse */
+    ctx.setLineDash([6*d,5*d]);ctx.strokeStyle=pf;ctx.lineWidth=2*d;ctx.beginPath();ctx.moveTo(X(0),Y(0));ctx.lineTo(X(vq),Y(vl));ctx.stroke();ctx.setLineDash([]);
+    ctx.shadowColor="rgba(0,0,0,.45)";ctx.shadowBlur=12*d;ctx.shadowOffsetX=2*d;ctx.shadowOffsetY=4*d;
+    /* Ladewagen, warmes Grau */
+    var wTop=vl+kupp;
+    ctx.fillStyle=F.gespT;rr(ctx,X(vq-wBreit/2),Y(wTop-.2),wBreit*f,wLang*f,.2*f);ctx.fill();
+    ctx.fillRect(X(vq-.08),Y(wTop+.05),.16*f,.5*f);
+    /* Traktor */
+    ctx.fillStyle="#1a1d20";
+    [-1.2,.62].forEach(function(o){rr(ctx,X(vq+o),Y(vl+.9),.58*f,1.8*f,.15*f);ctx.fill()});
+    [-1.0,.58].forEach(function(o){rr(ctx,X(vq+o),Y(vl+tAchs+.6),.42*f,1.2*f,.12*f);ctx.fill()});
+    ctx.fillStyle=F.gesp;rr(ctx,X(vq-.95),Y(vl+1.3),1.9*f,(1.3+tHinten)*f,.3*f);ctx.fill();
+    rr(ctx,X(vq-.55),Y(vl+tVor),1.1*f,(tVor-1.2)*f,.25*f);ctx.fill();
+    ctx.fillStyle="rgba(0,0,0,.35)";rr(ctx,X(vq-.8),Y(vl+1.1),1.6*f,1.5*f,.2*f);ctx.fill();
+    ctx.shadowColor="transparent";ctx.shadowBlur=0;ctx.shadowOffsetX=0;ctx.shadowOffsetY=0;
+  }
+  /* Auswurf, wenn vermessen — nach dem Gespann, denn er trifft auf den Wagen. */
+  var ausw=(hk.auswurf_quer_m||hk.auswurf_laengs_m)?{q:hk.auswurf_quer_m,l:hk.auswurf_laengs_m}:null;
+  if(ausw){
+    ctx.strokeStyle=F.gold;ctx.lineWidth=2.5*d;ctx.beginPath();ctx.arc(X(ausw.q),Y(ausw.l),Math.max(5*d,.4*f),0,Math.PI*2);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(X(ausw.q)-3*d,Y(ausw.l));ctx.lineTo(X(ausw.q)+3*d,Y(ausw.l));ctx.moveTo(X(ausw.q),Y(ausw.l)-3*d);ctx.lineTo(X(ausw.q),Y(ausw.l)+3*d);ctx.stroke();
+  }
+  if(hat){
+    /* Bezugspunkt und Unsicherheit */
+    var ur=Math.max(3*d,v.unsicherheit_m*f);
+    ctx.fillStyle=pf;ctx.globalAlpha=.22;ctx.beginPath();ctx.arc(X(vq),Y(vl),ur,0,Math.PI*2);ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=pf;ctx.lineWidth=2*d;ctx.beginPath();ctx.arc(X(vq),Y(vl),Math.max(5*d,ur),0,Math.PI*2);ctx.stroke();
+  }
+  /* Beschriftungen zuletzt, jeweils auf der Seite weg vom anderen Fahrzeug. */
+  var abfLinks=hat?vq<0:true;
+  schild(haeck()?"Häcksler · ich":"Häcksler",abfLinks?X(hBreit)+6*d:X(-hBreit)-6*d,Y(hAchs*.5),abfLinks,F.lead);
+  if(hat)schild(haeck()?"Abfahrer":"ich",abfLinks?X(vq-tBreit/2)-8*d:X(vq+tBreit/2)+8*d,Y(vl+tAchs*.5),!abfLinks,F.gesp);
+  if(ausw)schild("Auswurf",ausw.q<0?X(ausw.q)-(Math.max(5*d,.4*f)+6*d):X(ausw.q)+(Math.max(5*d,.4*f)+6*d),Y(ausw.l),ausw.q>=0,F.gold);
+  if(!hat){
+    var mt=verbindungWeg()?"keine Verbindung":frischerVektor()?"kein Kurs — erst ab 2 km/h":"kein aktueller Vektor";
+    ctx.font="700 "+(12*d)+"px "+schrift;var mw=ctx.measureText(mt).width;
+    ctx.fillStyle=F.rot;rr(ctx,W/2-mw/2-8*d,30*d,mw+16*d,20*d,6*d);ctx.fill();
+    ctx.fillStyle="#fff";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(mt,W/2,40.5*d);
+  }
+  /* Legende oben links */
+  ctx.font="600 "+(10.5*d)+"px "+schrift;var lt="▲ Fahrtrichtung · Raster "+(fein?"1 m":"5 m"),lw_=ctx.measureText(lt).width;
+  ctx.fillStyle=tag()?"rgba(255,255,255,.82)":"rgba(6,9,13,.72)";rr(ctx,4*d,4*d,lw_+12*d,20*d,6*d);ctx.fill();
+  ctx.fillStyle=F.text;ctx.textAlign="left";ctx.textBaseline="middle";ctx.fillText(lt,10*d,14.5*d);
+}
+
+/* ================================================================= KETTE */
+var STANDTEXT={dran:"dran",kommt:"kommt",unterwegs:"unterwegs",weg:"weg",bekannt:"bekannt"};
+function ketteAnsicht(){
+  var t='<div class="tafel rollt breit2"><div class="marke" data-k="kl_m"></div><div class="erklaerung" data-k="kl_e"></div><div data-k="kl"></div><div data-k="kl_fest"></div></div>';
+  var t2='<div class="tafel"><div class="marke">Dieser Knoten</div><ul class="liste">'+
+    listzeile("kn_k","pult","Kennung")+listzeile("kn_n","gespann","Name")+listzeile("kn_g","lineal","Gespann")+
+    listzeile("kn_a","funk","Anmeldung")+listzeile("kn_b","block","Im Kettenbuch")+listzeile("kn_v","achtung","Ohne Ausweis verworfen")+'</ul>'+
+    '<ul class="liste" data-k="kn_offen" style="margin-top:6px"></ul></div>';
+  return flaecheHtml([{name:"Liste",html:t},{name:"Knoten",html:t2}])+tastenHtml(TASTEN_HAUPT());
+}
+function kettenzeileHtml(z){
+  var art=haeck()&&z.uuid?"button":"div",wertT="–",unter="";
+  if(z.abstand_m!=null){wertT=fmt(z.abstand_m,1)+" m";unter=(z.guete?String(z.guete).toUpperCase():"")+(z.unsicherheit_m!=null?" ±"+fmt(z.unsicherheit_m*100,1)+" cm":"")}
+  else if(z.zustand==="weg"||z.zustand==="bekannt"){var vor=z.letzte_sicht_vor_s;wertT=vor==null?"–":vor<90?Math.round(vor)+" s":Math.round(vor/60)+" min";unter="her"}
+  else unter="keine Position";
+  if(z.dran&&z.dran_seit_s)unter=Math.floor(z.dran_seit_s/60)+":"+pad(Math.round(z.dran_seit_s%60))+" min dran";
+  return '<'+art+(art==="button"?' type="button" data-act="fest" data-arg="'+esc(z.kennung)+'"':"")+' class="kettenzeile '+esc(z.zustand||"")+'">'+
+    '<span class="kettenstand">'+(STANDTEXT[z.zustand]||"")+(z.naechster?"<br>als nächstes":"")+'</span>'+
+    '<span class="kettenname"><b>'+esc(z.name||z.kennung)+'</b><span><span class="mono">'+esc(z.kennung||"")+'</span>'+(z.platz?" · Platz "+z.platz:"")+(z.gespann?" · "+esc(z.gespann):"")+'</span></span>'+
+    (z.neu?'<span class="kettenneu">NEU</span>':"")+
+    '<span class="kettenwert">'+wertT+'<small>'+esc(unter)+'</small></span></'+art+'>';
+}
+function ketteAuf(){
+  var k=kette(),l=kettenliste();
+  set("kl_m",haeck()?"Kette · angemeldete Abfahrer":"Kette · wie der Häcksler sie sieht");
+  set("kl_e",haeck()?"Dran ist, wer am nächsten steht. Antippen hält einen fest, nochmal antippen gibt ihn frei. Die Reihenfolge ist eine Beschreibung, keine Zuteilung."
+                    :"Diese Liste kommt vom Häcksler. Wer dran ist, entscheidet er.");
+  html("kl",l.length?l.map(kettenzeileHtml).join(""):'<div class="zusatz">'+(haeck()?"Es hat sich noch niemand angemeldet.":"Noch keine Liste — der Häcksler hat noch nichts geschickt.")+'</div>');
+  html("kl_fest",k.festgehalten?'<div class="meldung gut">Festgehalten: '+esc(k.festgehalten)+'. Die Wahl nach Abstand ist ausgesetzt.</div><button type="button" class="taste" style="margin-top:8px;width:100%" data-act="fest" data-arg="">Wieder automatisch</button>':"");
+  var ek=eigeneKennung(),a=anmeldung();
+  zeile("kn_k",oder(ek.kennung),ek.kennung?"gut":"fehlt");
+  zeile("kn_n",oder(ek.name),"");zeile("kn_g",oder(ek.gespann),"");
+  if(haeck()){zeile("kn_a",(k.angemeldet||0)+" angemeldet",k.angemeldet?"gut":"warn");zeile("kn_b",String(oder(k.bekannt,0)),"");zeile("kn_v",String(k.verworfen_ohne_anmeldung||0),k.verworfen_ohne_anmeldung?"fehlt":"gut")}
+  else{zeile("kn_a",a.angemeldet?"angenommen"+(a.platz?", Platz "+a.platz:""):oder(a.grund,"offen"),a.angemeldet?"gut":"fehlt");zeile("kn_b",oder(a.kette),"");zeile("kn_v","–","")}
+  html("kn_offen",(ek.offen||[]).map(function(o){return '<li class="listzeile"><span class="listicon">'+SYM.achtung+'</span><span class="listname">'+esc(o)+'</span><span class="zeichen warn">!</span></li>'}).join(""));
+}
+function festhalten(kennungText){
+  fetch("/kette",{method:"POST",headers:kopf(),body:JSON.stringify({aktiv:kennungText})})
+    .then(function(a){return a.json()}).then(function(k){if(Daten)Daten.kette=k;aktualisieren()})
+    .catch(function(){hmi("fehler","Auswahl nicht übernommen")});
+}
+
+/* =============================================================== MASSBAND
+   Die Bandmessung wird gegen das MITTEL der letzten 5 Sekunden verglichen,
+   nicht gegen die Zahl, die gerade auf dem Schirm zappelt. */
+/* 'abstand_m' im Vektor zählt von Antenne zu Antenne, längs und quer von
+   Hinterachse zu Hinterachse (basislinie.py gleicht die Hebelarme erst nach
+   dem Abstand aus). Deshalb zwei Abstände — sonst misst das Band die
+   Antennenversätze mit. */
+var MESSARTEN={achsen:["Achsen","Hinterachsen"],antennen:["Antennen","Lotpunkte"],laengs:["Längs","Versatz"],quer:["Quer","Seite"]};
+function massband(){
+  var links='<div class="tafel rollt"><div class="marke">Maßband-Probe · im Stand, beide FIX</div>'+
+    '<div class="segment">'+Object.keys(MESSARTEN).map(function(a){return '<button type="button" data-act="messart" data-arg="'+a+'" data-k="ma_'+a+'">'+MESSARTEN[a][0]+'<small>'+MESSARTEN[a][1]+'</small></button>'}).join("")+'</div>'+
+    '<div class="mb-live"><div class="marke" data-k="mb_m" style="margin:0 0 4px"></div><div class="mb-zahl" data-k="mb_z">–</div><div class="mb-unter" data-k="mb_u"></div></div>'+
+    '<div class="eingabezeile"><label class="eingabename" for="mb-band">Maßband<span class="eingabewink" data-k="mb_bezug"></span></label>'+
+      '<input id="mb-band" class="gross" type="text" inputmode="decimal" autocomplete="off" placeholder="z. B. 12,40"><span class="eingabeeinheit">m</span></div>'+
+    '<div class="eingabezeile"><label class="eingabename" for="mb-notiz">Notiz<span class="eingabewink">z. B. Hof, Stand, Band an Radnabe</span></label>'+
+      '<input id="mb-notiz" class="text" type="text" autocomplete="off"><span class="eingabeeinheit"></span></div>'+
+    '<div data-k="mb_erg"></div></div>';
+  var rechts='<div class="tafel rollt"><div class="marke">Proben heute</div><div class="werte">'+
+    wertzeile("ms_n","Gültig / alle","")+wertzeile("ms_b","Bestanden ≤ 5 cm","")+wertzeile("ms_m","Mittlere Abweichung","cm")+wertzeile("ms_g","Größte Abweichung","cm")+'</div>'+
+    '<div class="marke abst">Liste · neueste oben</div><div data-k="ms_l"></div></div>';
+  return flaecheHtml([{name:"Probe",html:links},{name:"Liste",html:rechts}])+tastenHtml([
+    {act:"sicht",arg:"menue",t:"Menü",u:"Ansichten"},{act:"sicht",arg:"fahren",t:"Fahren",u:"Messung"},
+    {act:"sicht",arg:"pruefliste",t:"Prüfliste",u:""},{act:"probe",t:"Probe speichern",u:"gegen 5-s-Mittel",an:true}]);
+}
+function massbandAuf(){
+  Object.keys(MESSARTEN).forEach(function(a){cls("ma_"+a,UI.messart===a?"an":"")});
+  var fe=TT&&TT.fenster?TT.fenster[UI.messart]:null, fs=TT?TT.fenster_s:5;
+  set("mb_m","RTK "+MESSARTEN[UI.messart][0]+" · Mittel der letzten "+fmt(fs,0)+" s");
+  if(fe&&fe.n){
+    html("mb_z",fmt(fe.mittel_m,3)+"<small>m</small>");cls("mb_z","mb-zahl");
+    var gr=(TT.grenzen)||{},unruhig=fe.streuung_m>(gr.streuung_warn_m||0.03),wenig=fe.n<(gr.mindestens||10);
+    set("mb_u",fe.n+" Messungen · Streuung "+fmt(fe.streuung_m*100,1)+" cm · "+(fe.nur_fix?"durchgehend FIX":"schlechteste Güte "+String(fe.guete).toUpperCase())+
+      (unruhig?" · Fahrzeuge bewegen sich?":"")+(wenig?" · zu wenige Messungen":""));
+    sty("mb_u","color",(!fe.nur_fix||unruhig||wenig)?"var(--gelb)":"");
+  }else{html("mb_z","–");cls("mb_z","mb-zahl still");sty("mb_u","color","var(--gelb)");
+    var vk=vektor();
+    set("mb_u",verbindungWeg()?"keine Verbindung zum Rechner":(vk&&!veraltet()&&vk.kurs_haecksler_grad==null&&UI.messart!=="antennen")
+      ?"ohne Kurs keine Längs- und Querwerte — Häcksler einmal über 2 km/h fahren, oder Antennen messen":"kein frischer Vektor — Probe wäre ohne RTK-Wert")}
+  var bz=TT&&TT.bezug?TT.bezug[UI.messart]:"";
+  set("mb_bezug",bz?"Band von "+bz.replace(" zu "," bis "):"");
+  var p=MB.letzte;
+  if(MB.fehler)html("mb_erg",'<div class="meldung schlecht">'+esc(MB.fehler)+'</div>');
+  else if(p){
+    html("mb_erg",'<div class="mb-erg '+p.bewertung+'"><b>'+(p.abweichung_m==null?"–":vz(p.abweichung_m*100,1)+" cm")+'</b><div>Probe '+p.nr+' · '+esc(p.messart_text)+'<br>Band '+fmt(p.gemessen_m,3)+' m · RTK '+(p.rtk_m==null?"–":fmt(p.rtk_m,3)+" m")+
+      (p.maengel&&p.maengel.length?'<br>'+p.maengel.map(esc).join("<br>"):"")+'</div></div>');
+  }else html("mb_erg",'<div class="zusatz">Beide Fahrzeuge 10 bis 20 m auseinander abstellen, 5 s stehen lassen, dann das Band zwischen den Bezugspunkten ablesen und hier eintragen.</div>');
+  set("t_probe_u",MB.sendet?"wird gespeichert …":"gegen "+fmt(fs,0)+"-s-Mittel");
+
+  var st=(TT&&TT.statistik)||{};
+  wert("ms_n",(st.n||0)+" / "+(st.alle||0),"");
+  wert("ms_b",String(st.bestanden||0),st.bestanden?"gruen":"still");
+  wert("ms_m",st.n?vz(st.mittel_m*100,1):"–",st.n?(Math.abs(st.mittel_m)<=0.05?"gruen":"gelb"):"still");
+  wert("ms_g",st.n?vz(st.groesste_m*100,1):"–",st.n?(Math.abs(st.groesste_m)<=0.05?"gruen":Math.abs(st.groesste_m)<=0.15?"gelb":"rot"):"still");
+  var liste=((TT&&TT.proben)||[]).slice().reverse();
+  html("ms_l",liste.length?liste.map(function(p){
+    return '<div class="probe '+p.bewertung+(p.gueltig?"":" ungueltig")+'"><span class="pn">'+pad(p.nr)+'</span><span class="pt"><b>'+esc(p.messart_text)+' · Band '+fmt(p.gemessen_m,3)+' m</b><span>'+p.uhrzeit+' · RTK '+(p.rtk_m==null?"–":fmt(p.rtk_m,3)+" m")+' · '+p.n+' Messungen'+(p.gueltig?"":" · ungültig")+(p.notiz?" · "+esc(p.notiz):"")+'</span></span>'+
+      '<span class="pa">'+(p.abweichung_m==null?"–":vz(p.abweichung_m*100,1))+'<small>cm</small></span></div>';
+  }).join(""):'<div class="zusatz">Noch keine Probe.</div>');
+}
+function probeSpeichern(){
+  var band=document.getElementById("mb-band"),notiz=document.getElementById("mb-notiz");
+  if(!band||MB.sendet)return;
+  var roh=band.value.trim();
+  if(!roh){MB.fehler="Erst den Wert vom Maßband eintragen.";MB.letzte=null;aktualisieren();band.focus();return}
+  MB.sendet=true;MB.fehler="";aktualisieren();
+  fetch("/massband",{method:"POST",headers:kopf(),body:JSON.stringify({art:UI.messart,gemessen_m:roh,notiz:notiz?notiz.value:""})})
+    .then(function(a){return a.json().then(function(j){return {ok:a.ok,j:j}})})
+    .then(function(r){
+      MB.sendet=false;
+      if(!r.ok){MB.fehler=r.j.fehler||"nicht gespeichert";aktualisieren();return}
+      TT=r.j;MB.letzte=r.j.probe;band.value="";if(notiz)notiz.value="";
+      var p=MB.letzte;
+      if(p.abweichung_m==null)sagen("Probe gespeichert. Ohne R T K Wert.","rot");
+      else sagen("Probe gespeichert. Abweichung "+zahlWort(Math.abs(p.abweichung_m*100))+" Zentimeter.",p.bewertung==="gut"?"gruen":p.bewertung==="warn"?"gelb":"rot");
+      aktualisieren();
+    })
+    .catch(function(){MB.sendet=false;MB.fehler="Rechner nicht erreicht — Probe NICHT gespeichert.";aktualisieren()});
+}
+
+/* ============================================================= PRÜFLISTE */
+function pruefliste(){
+  return '<div class="flaeche"><div class="tafel rollt"><div class="marke" data-k="pl_m">Prüfliste</div><div class="fortschritt"><i data-k="pl_f"></i></div><div data-k="pl"></div></div></div>'+tastenHtml(TASTEN_HAUPT());
+}
+function prueflisteBauen(){
+  if(!R.pl||!TT)return;
+  var punkte=TT.pruefliste.punkte,sig=punkte.map(function(p){return p.id}).join(",");
+  if(R.pl._sig===sig)return;
+  R.pl._sig=sig;var gruppe="",h=[];
+  punkte.forEach(function(p){
+    if(p.gruppe!==gruppe){gruppe=p.gruppe;h.push('<div class="pgruppe">'+esc(gruppe)+'</div>')}
+    h.push('<div class="ppunkt" data-k="pp_'+p.id+'"><button type="button" class="phaken" data-act="haken" data-arg="'+p.id+'" aria-label="abhaken">'+SYM.haken+'</button>'+
+      '<div class="ptitel">'+esc(p.titel)+'<small data-k="pp_'+p.id+'_z"></small></div><div class="pwink">'+esc(p.wink)+'</div>'+
+      '<div class="pzeile"><span class="psys" data-k="pp_'+p.id+'_s" hidden></span><input class="pnotiz" type="text" autocomplete="off" placeholder="Notiz" data-notiz="'+p.id+'" data-k="pp_'+p.id+'_n"></div></div>');
+  });
+  R.pl.innerHTML=h.join("");R.pl._h=null;
+  Array.prototype.forEach.call(R.pl.querySelectorAll("[data-k]"),function(e){R[e.getAttribute("data-k")]=e});
+}
+function prueflisteAuf(){
+  if(!TT){set("pl_m","Prüfliste · wird geladen …");return}
+  prueflisteBauen();
+  var pl=TT.pruefliste;
+  set("pl_m","Prüfliste · "+TT.datum+" · "+pl.erledigt+" von "+pl.gesamt+" erledigt");
+  sty("pl_f","width",(100*pl.erledigt/Math.max(1,pl.gesamt)).toFixed(1)+"%");
+  pl.punkte.forEach(function(p){
+    cls("pp_"+p.id,"ppunkt"+(p.erledigt?" erledigt":""));
+    set("pp_"+p.id+"_z",p.erledigt&&p.zeit?p.zeit:"");
+    var s=p.system;
+    versteckt("pp_"+p.id+"_s",!s);
+    if(s){set("pp_"+p.id+"_s",(s.erfuellt?"✓ System: ":"System: ")+s.text);cls("pp_"+p.id+"_s","psys"+(s.erfuellt?" ja":""))}
+    var n=R["pp_"+p.id+"_n"];
+    if(n&&document.activeElement!==n&&n._stand!==p.notiz){n.value=p.notiz||"";n._stand=p.notiz}
+  });
+}
+function pruefpunkt(roh){
+  fetch("/pruefpunkt",{method:"POST",headers:kopf(),body:JSON.stringify(roh)})
+    .then(function(a){return a.json()}).then(function(j){if(j&&j.pruefliste){TT=j;aktualisieren()}})
+    .catch(function(){hmi("fehler","Prüfpunkt nicht gespeichert: "+roh.id)});
+}
+
+/* ============================================================= FAHRZEUGE
+   Die einzige Ansicht, die neben Kette, Maßband und Prüfliste scrollen
+   darf: Sie wird im Stand ausgefüllt, mit dem Bandmaß daneben. */
+var FELDER={
+  haecksler:{titel:"Häcksler — Leitmaschine",erklaerung:"Alle Maße von der MITTE DER HINTERACHSE. Längs positiv = weiter vorn, quer positiv = rechts in Fahrtrichtung.",
+    zeilen:[["name","Bezeichnung","","text",""],["achsabstand_m","Achsabstand","m","zahl","Vorderachse bis Hinterachse"],
+      ["antenne_laengs_m","Moving-Base längs","m","zahl","positiv = vor der Hinterachse"],["antenne_quer_m","Moving-Base quer","m","zahl","positiv = rechts der Längsachse"],
+      ["antenne_hoch_m","Moving-Base Höhe","m","zahl","über Grund"],["auswurf_laengs_m","Auswurf längs","m","zahl","wo der Strom auftrifft, nicht das Rohrende"],
+      ["auswurf_quer_m","Auswurf quer","m","zahl","negativ = wirft nach links"],["auswurf_hoch_m","Auswurf Höhe","m","zahl","über Grund"]]},
+  traktor:{titel:"Traktor — Abfahrer",erklaerung:"Alle Maße von der MITTE DER HINTERACHSE. Die Deichselkupplung sitzt dahinter, ihr Wert ist deshalb fast immer negativ.",
+    zeilen:[["name","Bezeichnung","","text",""],["achsabstand_m","Achsabstand","m","zahl","Vorderachse bis Hinterachse"],
+      ["antenne_laengs_m","Rover längs","m","zahl","positiv = vor der Hinterachse"],["antenne_quer_m","Rover quer","m","zahl","positiv = rechts der Längsachse"],
+      ["antenne_hoch_m","Rover Höhe","m","zahl","über Grund"],["kupplung_laengs_m","Kupplung bis Hinterachse","m","zahl","negativ = hinter der Achse"],
+      ["kupplung_hoch_m","Kupplung Höhe","m","zahl","über Grund"]]},
+  ladewagen:{titel:"Ladewagen",erklaerung:"Alle Maße von der DEICHSELKUPPLUNG nach hinten.",
+    zeilen:[["name","Bezeichnung","","text",""],["typ","Bauart","","text","z.B. Rotorladewagen"],["volumen_m3","Volumen","m³","zahl","nach Prospekt"],
+      ["kupplung_zu_letzter_achse_m","Kupplung bis letzte Achse","m","zahl","Länge bis zur hintersten Achse"],
+      ["ladeflaeche_anfang_m","Kupplung bis Ladefläche","m","zahl","erst für Test 2"],["ladeflaeche_laenge_m","Länge Ladefläche","m","zahl","erst für Test 2"],
+      ["ladeflaeche_breite_m","Breite Ladefläche","m","zahl","erst für Test 2"],["inhalt_tonnen_bei_voll","Gewicht voll","t","zahl","einmal wiegen, erst für Test 2"]]}
+};
+var AUSWEISFELDER=[["name","Name in der Kette",""],["traktortyp","Traktortyp","abfahrer"],["ladewagentyp","Ladewagentyp","abfahrer"],["haecksertyp","Häckslertyp","haecksler"]];
+function eigeneBereiche(){return haeck()?["haecksler"]:["traktor","ladewagen"]}
+function entwurfWert(pfad,vorgabe){return Object.prototype.hasOwnProperty.call(Entwurf,pfad)?Entwurf[pfad]:vorgabe}
+
+function fahrzeuge(){
+  return '<div class="flaeche"><div class="tafel rollt" data-k="fzform"><div class="marke">Fahrzeugmaße</div><div class="zusatz">wird geladen …</div></div></div>'+
+    tastenHtml([{act:"sicht",arg:"menue",t:"Menü",u:"zurück"},{act:"verwerfen",t:"Verwerfen",u:"neu laden"},{act:"speichern",t:"Speichern",u:"gilt sofort",an:true}]);
+}
+function fahrzeugeBauen(){
+  var ziel=R.fzform;if(!ziel||!Konfig)return;
+  var meine=eigeneBereiche(),ek=eigeneKennung(),h=[];
+  function eingabe(id,name,wink,wert,text,aus,einheit){
+    return '<div class="eingabezeile"><label class="eingabename" for="'+id+'">'+name+(wink?'<span class="eingabewink">'+wink+'</span>':"")+'</label>'+
+      '<input id="'+id+'" class="'+(text?"text":"")+'" type="text"'+(text?"":' inputmode="decimal"')+' value="'+esc(wert)+'"'+(aus?" disabled":"")+'><span class="eingabeeinheit">'+(einheit||"")+'</span></div>';
+  }
+  h.push('<div class="gruppe"><div class="marke">Ausweis dieses Knotens</div><div class="erklaerung">Die Kennung wurde beim ersten Start erzeugt und bleibt. Name und Typen stehen auf dem Häcksler-Tablet in der Kette.</div>');
+  h.push(eingabe("f-kennung-fest","Kennung","erzeugt am ersten Tag, nicht änderbar",oder(ek.kennung),true,true));
+  AUSWEISFELDER.forEach(function(fd){
+    if(fd[2]&&fd[2]!==(haeck()?"haecksler":"abfahrer"))return;
+    h.push(eingabe("f-kennung-"+fd[0],fd[1],"",entwurfWert("kennung."+fd[0],ek[fd[0]]||""),true,false));
+  });
+  if(ek.frueher&&ek.frueher.length)h.push('<div class="erklaerung">Frühere Kennungen dieses Knotens: '+ek.frueher.map(esc).join(", ")+'. Sie entstehen, wenn die Karte in einer anderen Platine läuft.</div>');
+  if(ek.geklont)h.push('<div class="meldung schlecht">Diese Karte wurde auf einer anderen Platine erzeugt. Es gilt die neue Kennung.</div>');
+  h.push('</div><div class="gruppe"><div class="marke">Messdatum</div><div class="erklaerung">Solange hier nichts steht, gelten die Maße als ungemessen. Ein Datum lässt sich nicht versehentlich richtig hinschreiben, eine Null schon.</div>');
+  h.push(eingabe("f-vermessen_am","Vermessen am, von wem","",entwurfWert("vermessen_am",Konfig.vermessen_am||""),true,false).replace('type="text"','type="text" placeholder="2026-09-30, Martin"'));
+  h.push('</div>');
+  Object.keys(FELDER).forEach(function(bereich){
+    var b=FELDER[bereich],meins=meine.indexOf(bereich)>=0,werte=Konfig[bereich]||{};
+    h.push('<div class="gruppe'+(meins?"":" fremd")+'"><div class="marke">'+b.titel+(meins?"":" · von der Gegenstelle")+'</div><div class="erklaerung">'+b.erklaerung+(meins?"":" Diese Maße pflegt der andere Knoten; hier stehen sie nur zur Kontrolle.")+'</div>');
+    b.zeilen.forEach(function(fd){
+      var roh=werte[fd[0]];if(roh===undefined||roh===null)roh=fd[3]==="text"?"":0;
+      var w=entwurfWert(bereich+"."+fd[0],fd[3]==="zahl"?String(roh).replace(".",","):roh);
+      h.push(eingabe("f-"+bereich+"-"+fd[0],fd[1],fd[4],w,fd[3]==="text",!meins,fd[2]));
+    });
+    h.push('</div>');
+  });
+  if(Konfig.offen&&Konfig.offen.length){
+    h.push('<div class="gruppe"><div class="marke">Noch offen</div><ul class="liste">'+Konfig.offen.map(function(o){return '<li class="listzeile"><span class="listicon">'+SYM.achtung+'</span><span class="listname">'+esc(o)+'</span><span class="zeichen warn">!</span></li>'}).join("")+'</ul></div>');
+  }
+  if(Meldung)h.push('<div class="meldung '+(Meldung.gut?"gut":"schlecht")+'">'+esc(Meldung.text)+'</div>');
+  ziel.innerHTML=h.join("");
+  /* Jeder Tastendruck wandert SOFORT in den Entwurf — sonst sprang ein
+     halb getippter Wert beim Neuzeichnen auf 0 zurück, und genau diese 0
+     wurde gespeichert (Fehler vom 22.09.). */
+  Array.prototype.forEach.call(ziel.querySelectorAll('input[id^="f-"]'),function(e){
+    if(e.id==="f-kennung-fest")return;
+    e.addEventListener("input",function(){Entwurf[pfadAus(e.id)]=e.value});
+  });
+}
+/* 'f-traktor-antenne_laengs_m' wird zu 'traktor.antenne_laengs_m'. */
+function pfadAus(id){var rest=id.slice(2),i=rest.indexOf("-");return i<0?rest:rest.slice(0,i)+"."+rest.slice(i+1)}
+function konfigHolen(){
+  fetch("/konfig",{cache:"no-store"}).then(function(a){return a.json()})
+    .then(function(k){Konfig=k;Entwurf={};fahrzeugeBauen()})
+    .catch(function(){Meldung={text:"Konfiguration nicht erreichbar",gut:false};Konfig=Konfig||{};fahrzeugeBauen()});
+}
+/* Erst der Ausweis, dann die Maße: Der Abfahrer meldet sich nach dem
+   Ausweis neu an, und in dieser Anmeldung fahren die Maße mit. */
+function ausweisSpeichern(){
+  var nutz={},etwas=false;
+  AUSWEISFELDER.forEach(function(fd){var p="kennung."+fd[0];if(Object.prototype.hasOwnProperty.call(Entwurf,p)){nutz[fd[0]]=Entwurf[p];etwas=true}});
+  if(!etwas)return Promise.resolve(null);
+  return fetch("/kennung",{method:"POST",headers:kopf(),body:JSON.stringify(nutz)})
+    .then(function(a){return a.json()}).then(function(k){if(Daten)Daten.kennung=k;return k}).catch(function(){return null});
+}
+function konfigSpeichern(){
+  ausweisSpeichern().then(function(){
+    var nutz={vermessen_am:entwurfWert("vermessen_am",Konfig&&Konfig.vermessen_am||"")};
+    eigeneBereiche().forEach(function(bereich){
+      var block={},werte=(Konfig&&Konfig[bereich])||{};
+      FELDER[bereich].zeilen.forEach(function(fd){
+        var roh=werte[fd[0]];if(roh===undefined||roh===null)roh=fd[3]==="text"?"":0;
+        block[fd[0]]=entwurfWert(bereich+"."+fd[0],fd[3]==="zahl"?String(roh).replace(".",","):roh);
+      });
+      nutz[bereich]=block;
+    });
+    return fetch("/konfig",{method:"POST",headers:kopf(),body:JSON.stringify(nutz)});
+  }).then(function(a){return a.json()}).then(function(k){
+    if(k.fehler)throw new Error(k.fehler);
+    Konfig=k;Entwurf={};
+    Meldung={text:"Gespeichert als Fassung "+k.fassung+". "+(k.offen&&k.offen.length?"Noch "+k.offen.length+" Punkte offen.":"Vollständig."),gut:true};
+    fahrzeugeBauen();hmi("taste","Fahrzeugmaße gespeichert, Fassung "+k.fassung);
+  }).catch(function(f){Meldung={text:"Speichern fehlgeschlagen"+(f&&f.message?": "+f.message:""),gut:false};fahrzeugeBauen()});
+}
+
+/* ================================================================ SYSTEM */
+function system(){
+  var a='<div class="tafel"><div class="marke">Eigener Empfänger · Bynav M21</div><ul class="liste">'+
+    listzeile("ye_an","chip","Anschluss")+listzeile("ye_nv","gps","NovAtel-Sätze")+listzeile("ye_nm","reihe","NMEA-Sätze")+listzeile("ye_rt","funk","RTCM-Rahmen")+
+    listzeile("ye_de","achtung","Defekte Sätze")+listzeile("ye_st","uhr","Stumm seit")+'</ul>'+
+    '<div class="marke abst">Empfänger der Gegenstelle</div><ul class="liste">'+listzeile("yg_nv","gps","NovAtel-Sätze")+listzeile("yg_rt","funk","RTCM-Rahmen")+listzeile("yg_de","achtung","Defekte Sätze")+'</ul></div>';
+  var b='<div class="tafel"><div class="marke">Funkstrecke</div><ul class="liste">'+
+    listzeile("yf_v","funk","Verbindung")+listzeile("yf_l","uhr","Laufzeit")+listzeile("yf_a","achtung","Abrisse")+listzeile("yf_la","kreis","Längster Ausfall")+listzeile("yf_r","block","RTCM übertragen")+'</ul>'+
+    '<div class="marke abst" data-k="yw_m">WLAN</div><ul class="liste">'+listzeile("yw_p","funk","Pegel")+listzeile("yw_s","person","Geräte / Güte")+listzeile("yw_b","tacho","Bitrate")+listzeile("yw_n","ort","Netz")+'</ul></div>';
+  var c='<div class="tafel"><div class="marke">Rechner · Raspberry Pi</div><ul class="liste">'+
+    listzeile("yr_t","tacho","Temperatur")+listzeile("yr_l","chip","Last")+listzeile("yr_p","block","Platte frei")+listzeile("yr_u","achtung","Unterspannung")+listzeile("yr_g","kurve","Gedrosselt")+'</ul>'+
+    '<div class="marke abst">Testtag-Aufzeichnung</div><ul class="liste">'+listzeile("yt_z","block","Messzeilen")+listzeile("yt_b","reihe","Tablet-Bild")+listzeile("yt_h","uhr","Tablet-Einträge")+listzeile("yt_d","block","Protokoll")+'</ul></div>';
+  return flaecheHtml([{name:"Empfänger",html:a},{name:"Funk",html:b},{name:"Rechner",html:c}])+
+    tastenHtml([{act:"sicht",arg:"menue",t:"Menü",u:"Ansichten"},{act:"sicht",arg:"fahren",t:"Fahren",u:"Messung"},{act:"sicht",arg:"system",t:"System",u:"",an:true}]);
+}
+function pegelzeichen(dbm){if(dbm==null)return "";return dbm>=-65?"gut":dbm>=-78?"warn":"fehlt"}
+function systemAuf(){
+  var weg=verbindungWeg(),e=weg?{}:((Daten&&Daten.empfaenger)||{}),g=(Daten&&Daten.gegen_empfaenger)||{};
+  zeile("ye_an",oder(e.port),e.verbunden?"gut":"fehlt");zeile("ye_nv",oder(e.novatel,0),"gut");zeile("ye_nm",oder(e.nmea,0),"gut");zeile("ye_rt",oder(e.rtcm,0),"gut");
+  zeile("ye_de",oder(e.defekt,0),(e.defekt||0)===0?"gut":"warn");zeile("ye_st",fmt(e.stumm_s)+" s",(e.stumm_s||0)>3?"fehlt":"gut");
+  zeile("yg_nv",oder(g.novatel,"–"),g.novatel?"gut":"");zeile("yg_rt",oder(g.rtcm,"–"),g.rtcm?"gut":"");zeile("yg_de",oder(g.defekt,"–"),(g.defekt||0)===0?(g.novatel?"gut":""):"warn");
+  var f=weg?{}:((Daten&&Daten.funk)||{}),w=((Daten&&Daten.system)||{}).wlan||{},ap=w.modus==="ap";
+  zeile("yf_v",f.verbunden?"steht seit "+fmt(f.steht_seit_s,0)+" s":"weg",f.verbunden?"gut":"fehlt");
+  zeile("yf_l",fmt(f.laufzeit_ms)+" ms · höchstens "+fmt(f.laufzeit_hoechst_ms)+" ms",(f.laufzeit_ms||0)<120?"gut":"warn");
+  zeile("yf_a",oder(f.abrisse,0),(f.abrisse||0)===0?"gut":"warn");zeile("yf_la",fmt(f.laengster_ausfall_s)+" s",(f.laengster_ausfall_s||0)<2?"gut":"warn");
+  zeile("yf_r",f.rtcm_bytes==null?"–":fmt(f.rtcm_bytes/1024,0)+" KiB","gut");
+  set("yw_m","WLAN"+(w.schnittstelle?" · "+w.schnittstelle:"")+(ap?" · Zugangspunkt":""));
+  set("yw_p_n",ap?"Schwächster Pegel":"Empfangspegel");
+  zeile("yw_p",w.pegel_dbm==null?"–":fmt(w.pegel_dbm)+" dBm",pegelzeichen(w.pegel_dbm));
+  set("yw_s_n",ap?"Verbundene Geräte":"Verbindungsgüte");
+  zeile("yw_s",ap?oder(w.stationen,0):oder(w.link),ap?((w.stationen||0)>0?"gut":"warn"):"");
+  zeile("yw_b",w.bitrate_mbit==null?"–":fmt(w.bitrate_mbit)+" Mbit/s","");
+  zeile("yw_n",oder(w.ssid)+(w.kanal?" · Kanal "+w.kanal:""),w.ssid?"gut":"");
+  var sy=(Daten&&Daten.system)||{},dr=sy.drosselung,m=(Daten&&Daten.messung)||{};
+  zeile("yr_t",sy.temperatur_c==null?"–":fmt(sy.temperatur_c)+" °C",sy.temperatur_c==null?"":sy.temperatur_c>=80?"fehlt":sy.temperatur_c>=70?"warn":"gut");
+  zeile("yr_l",oder(sy.last_1min),"");zeile("yr_p",sy.platte_frei_mb==null?"–":fmt(sy.platte_frei_mb,0)+" MB",sy.platte_frei_mb==null?"":sy.platte_frei_mb<500?"fehlt":"gut");
+  zeile("yr_u",!dr?"nicht lesbar":dr.unterspannung_jetzt?"JETZT":dr.unterspannung_gewesen?"gewesen":"nein",!dr?"":dr.unterspannung_jetzt?"fehlt":dr.unterspannung_gewesen?"warn":"gut");
+  zeile("yr_g",!dr?"nicht lesbar":dr.gedrosselt_jetzt?"JETZT":dr.gedrosselt_gewesen?"gewesen":"nein",!dr?"":dr.gedrosselt_jetzt?"fehlt":dr.gedrosselt_gewesen?"warn":"gut");
+  zeile("yt_z",oder(m.zeilen,0)+" · "+fmt(m.laufzeit_min)+" min","gut");
+  zeile("yt_b",TT?(TT.mitschrift_zeilen+" Sekunden"):"–",TT&&TT.mitschrift_zeilen?"gut":"");
+  zeile("yt_h",TT?String(TT.hmi_anzahl):"–","");
+  zeile("yt_d",TT&&TT.dateien?TT.dateien.protokoll:"–","");
+}
+
+/* ================================================================== MENÜ */
+function menue(){
+  var karten=[
+    {id:"fahren",icon:haeck()?"haecksler":"gespann",name:"Fahren",k:"mz_f"},
+    {id:"kette",icon:"kette",name:"Kette",k:"mz_k"},
+    {id:"massband",icon:"band",name:"Maßband",k:"mz_m"},
+    {id:"pruefliste",icon:"liste",name:"Prüfliste",k:"mz_p"},
+    {id:"fahrzeuge",icon:"lineal",name:"Fahrzeuge",k:"mz_v"},
+    {id:"system",icon:"pult",name:"System",k:"mz_s"},
+    {id:"auftrag",icon:"feldkarte",name:"Auftrag",k:"mz_auf",act:"auftrag"}
+  ];
+  return '<div class="wahl"><div class="marke">VYREL · Testtag · Feldtest 1 RTK</div><h1 class="wahltitel" data-k="m_t"></h1>'+
+    '<p class="wahlunter">Die Rolle steht fest, sie wurde beim Start vergeben. Hier wählst du die Ansicht.</p><div class="rollen">'+
+    karten.map(function(c){return '<button type="button" class="rollenkarte" data-act="'+(c.act||"sicht")+'" data-arg="'+c.id+'" data-k="'+c.k+'_c"><span class="rollenzeichen">'+SYM[c.icon]+
+      '</span><span class="rollentext"><span class="rollenname">'+c.name+'</span><span class="rollenzweck" data-k="'+c.k+'"></span></span><span class="rollenpfeil">›</span></button>'}).join("")+
+    '</div><ul class="liste standliste">'+listzeile("ms_v","gps","Vektor")+listzeile("ms_f","funk","Funk")+listzeile("ms_a","block","Aufzeichnung")+'</ul></div>'+
+    tastenHtml([{act:"sicht",arg:"fahren",t:"Fahren",u:"zurück zur Anzeige"}]);
+}
+function menueAuf(){
+  var weg=verbindungWeg(),v=frischerVektor(),k=kette(),a=anmeldung(),kd=konfigDaten(),m=(Daten&&Daten.messung)||{};
+  set("m_t",Rolle?(haeck()?"Häcksler":"Abfahrer"):"Knoten");
+  set("mz_f",weg?"keine Verbindung zum Rechner":v?v.art.toUpperCase()+(v.kurs_haecksler_grad!=null?" · längs "+vz(v.laengs_m,2)+" m":" · kein Kurs"):"kein Vektor");
+  var dr=dranZeile();
+  set("mz_k",haeck()?(k.angemeldet?k.angemeldet+" angemeldet · dran "+(dr?(dr.name||dr.kennung):"niemand"):"kein Abfahrer angemeldet")
+                    :(ich()&&ich().dran?"du bist dran":a.angemeldet?"angemeldet"+(a.platz?", Platz "+a.platz:""):"nicht angemeldet"));
+  cls("mz_k_c","rollenkarte"+((haeck()?!k.angemeldet:a.angemeldet===false)?" mahnt":""));
+  var st=(TT&&TT.statistik)||{};
+  set("mz_m",TT?(st.alle?st.alle+" Proben · "+(st.bestanden||0)+" bestanden":"noch keine Probe"):"–");
+  set("mz_p",TT?TT.pruefliste.erledigt+" von "+TT.pruefliste.gesamt+" erledigt":"–");
+  var offen=(kd.offen||[]).length;
+  set("mz_v",offen?offen+" Maße noch offen":(kd.fassung?"vollständig · Fassung "+kd.fassung:"vollständig"));
+  cls("mz_v_c","rollenkarte"+(offen?" mahnt":""));
+  set("mz_s","Empfänger, Funk, WLAN, Rechner");
+  set("mz_auf","Felder, Kunde, Start/Pause/Ende, Stunden");
+  zeile("ms_v",v?v.art.toUpperCase()+" · ±"+fmt(v.unsicherheit_m*100,1)+" cm":(weg?"Rechner antwortet nicht":"kein Vektor"),v?guetezeichen(v.art):"fehlt");
+  var f=weg?{}:((Daten&&Daten.funk)||{});
+  zeile("ms_f",f.verbunden?fmt(f.laufzeit_ms)+" ms · "+oder(f.abrisse,0)+" Abrisse":"keine Verbindung",f.verbunden?"gut":"fehlt");
+  zeile("ms_a",oder(m.zeilen,0)+" Zeilen · "+Math.round((m.fix_anteil||0)*100)+" % FIX","gut");
+}
+
+/* ======================================================= Kopf und Band */
+function kopfAuf(){
+  set("k_rolle",Rolle?(haeck()?"Häcksler":"Abfahrer"):"VYREL");
+  set("k_ort","VYREL · Testtag · "+TITEL[UI.sicht]);
+  var weg=verbindungWeg(),f=weg?{}:((Daten&&Daten.funk)||{}),b=0;
+  if(f.verbunden){var l=f.laufzeit_ms||0;b=l<40?4:l<80?3:l<150?2:1}
+  cls("k_funk","balken4 "+(b?"b"+b:"aus"));
+  var v=frischerVektor();
+  sty("k_rtkp","background",!v?"var(--rot)":v.art==="fix"?"var(--gruen)":v.art==="float"?"var(--gelb)":"var(--rot)");
+  set("k_rtk","RTK "+(v?v.art:"–"));
+  var d=new Date();set("k_uhr",pad(d.getHours())+":"+pad(d.getMinutes()));
+  set("k_ton",TON?"Ton an":"Ton aus");cls("k_ton","knopfklein"+(TON?" an":""));
+  set("k_licht",tag()?"Tag":"Nacht");
+}
+function bandAuf(){
+  if(!R.band)return;
+  var k=kette(),mein=ich(),a=anmeldung(),m="Kette",t="",z="",kl="";
+  if(verbindungWeg()){m="Kette";t="keine Verbindung zum eigenen Rechner";kl="leer"}
+  else if(!haeck()){
+    m="Ich";
+    if(veraltet()&&(mein||a.angemeldet)){t="zuletzt: "+(mein&&mein.dran?"du warst dran":(a.platz?"Platz "+a.platz:"angemeldet"));z="nicht aktuell";kl="leer"}
+    else if(a.angemeldet===false&&!mein){t="nicht angemeldet"+(a.grund?" — "+a.grund:"");kl="leer"}
+    else if(mein&&mein.dran){t="DU BIST DRAN";z=mein.abstand_m!=null?fmt(mein.abstand_m,1)+" m":"";kl="dran"}
+    else if(mein){var vor=(mein.vor_mir||[]).filter(Boolean);t=(mein.naechster?"als nächstes":"warten")+(vor.length?" · vor dir: "+vor.join(", "):"");z=mein.platz?"Platz "+mein.platz:"";kl="wartet"}
+    else{t=a.platz?"angemeldet, Platz "+a.platz:"angemeldet";z=a.kette||"";kl="leer"}
+  }else{
+    var dr=dranZeile(),n=naechsterZeile();
+    if(!k.angemeldet){t="kein Abfahrer angemeldet";z=k.bekannt?k.bekannt+" bekannt":"";kl="leer"}
+    else{kl=dr?"dran":"wartet";t=(dr?"dran: "+(dr.name||dr.kennung):"niemand dran")+(n?"  ·  dann: "+(n.name||n.kennung):"");z=k.angemeldet+" angemeldet"}
+    if(k.verworfen_ohne_anmeldung){kl="wartet";t+="  ·  "+k.verworfen_ohne_anmeldung+" ohne Ausweis verworfen"}
+  }
+  set("b_m",m);set("b_t",t);set("b_z",z);cls("band","band "+kl);
+}
+var alarmText="";
+function alarmAuf(){
+  var al="";
+  if(verbindungWeg())al="Keine Verbindung zum Rechner";
+  else if(UI.sicht==="fahren"&&veraltet())al=vektor()?"Daten zu alt":"Kein Vektor";
+  var e=R.alarm;if(e){e.hidden=!al;if(al)set("alarm",al)}
+  if(al!==alarmText){
+    if(al)hmi("alarm",al);else if(alarmText)hmi("alarm_ende",alarmText);
+    alarmText=al;
+  }
+}
+
+/* ================================================================ Zeichnen */
+var ANSICHTEN={menue:[menue,menueAuf],fahren:[fahren,fahrenAuf],kette:[ketteAnsicht,ketteAuf],massband:[massband,massbandAuf],
+  pruefliste:[pruefliste,prueflisteAuf],fahrzeuge:[fahrzeuge,function(){}],system:[system,systemAuf]};
+
+function aufbauen(){
+  UI.schmal=window.innerWidth<780;
+  var a=ANSICHTEN[UI.sicht];
+  geraet.innerHTML=kopfHtml()+(UI.sicht==="menue"?"":bandHtml())+a[0]();
+  R={};
+  Array.prototype.forEach.call(geraet.querySelectorAll("[data-k]"),function(e){R[e.getAttribute("data-k")]=e});
+  LEIN=Array.prototype.slice.call(geraet.querySelectorAll("canvas[data-cv]"));
+  if(UI.sicht==="fahrzeuge"){if(Konfig)fahrzeugeBauen();konfigHolen()}
+  aktualisieren();
+}
+function aktualisieren(){
+  kopfAuf();bandAuf();alarmAuf();
+  ANSICHTEN[UI.sicht][1]();
+  LEIN.forEach(function(c){if(c.isConnected&&c.offsetParent!==null&&c.getAttribute("data-cv")==="draufsicht")zeichneDraufsicht(c)});
+  ansagenPruefen();
+}
+
+/* ================================================================ Sprache
+   Ruhig, in ganzen Sätzen, mit weichem Zweiklang davor. Nicht plappern:
+   ein Zustand muss erst stehen (FIX 2 s, Funk 2 s), gleiche Ansage
+   frühestens nach 8 s, zwei Ansagen mindestens 2,5 s auseinander. Jede
+   Ansage geht ins Protokoll auf dem Pi. */
+var TON=speicherAlt("vyrel_ton","franz_ton")!=="aus";
+var AUDIO=null,STIMMEN=[],STIMME=null,letzteZeit=0,gesagt={},ANSAGEN=[];
+function stimmenLaden(){
+  if(!window.speechSynthesis)return;
+  var alle=window.speechSynthesis.getVoices()||[];
+  STIMMEN=alle.filter(function(v){return /^de(-|_|$)/i.test(v.lang)}).map(function(v){
+    var p=0;if(/de-DE/i.test(v.lang))p+=3;if(/(Premium|Enhanced|Natural|Neural|Erweitert)/i.test(v.name))p+=6;if(v.localService)p+=2;
+    if(/(Grandma|Grandpa|Eddy|Flo|Reed|Rocko|Sandy|Shelley|Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Jester|Organ|Trinoids|Whisper|Wobble|Zarvox)/i.test(v.name))p-=10;
+    return {v:v,p:p};
+  }).sort(function(a,b){return b.p-a.p}).map(function(x){return x.v});
+  if(!STIMME||STIMMEN.indexOf(STIMME)<0)STIMME=STIMMEN[0]||null;
+}
+if(window.speechSynthesis){stimmenLaden();try{window.speechSynthesis.addEventListener("voiceschanged",stimmenLaden)}catch(e){window.speechSynthesis.onvoiceschanged=stimmenLaden}}
+function klang(art){
+  if(!AUDIO)return;
+  try{
+    if(AUDIO.state==="suspended")AUDIO.resume();
+    var folge=art==="rot"?[[740,0],[554,.22],[740,.44]]:art==="gruen"?[[587,0],[880,.16]]:art==="gelb"?[[660,0],[660,.2]]:[[880,0],[659,.16]];
+    var t0=AUDIO.currentTime+.02;
+    folge.forEach(function(n){[1,2].forEach(function(ob){
+      var o=AUDIO.createOscillator(),g=AUDIO.createGain();o.type="sine";o.frequency.value=n[0]*ob;
+      var t=t0+n[1],sp=ob===1?.16:.035;
+      g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(sp,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+.9);
+      o.connect(g);g.connect(AUDIO.destination);o.start(t);o.stop(t+1);
+    })});
+  }catch(e){}
+}
+function sagen(text,art,sofort){
+  var jetzt=performance.now()/1000;
+  if(!sofort&&jetzt-letzteZeit<2.5)return false;
+  if(!sofort&&gesagt[text]&&jetzt-gesagt[text]<8)return false;
+  gesagt[text]=jetzt;letzteZeit=jetzt;
+  ANSAGEN.push({t:Date.now(),text:text,art:art,ton:TON});if(ANSAGEN.length>50)ANSAGEN.shift();
+  hmi("ansage",text+(TON?"":" [stumm]"));
+  if(!TON)return true;
+  klang(art);
+  if(window.speechSynthesis){
+    try{
+      window.speechSynthesis.cancel();
+      var u=new SpeechSynthesisUtterance(text);u.lang="de-DE";if(STIMME)u.voice=STIMME;u.rate=.93;u.pitch=1;u.volume=1;
+      setTimeout(function(){window.speechSynthesis.speak(u)},art==="rot"?520:340);
+    }catch(e){}
+  }
+  return true;
+}
+function zahlWort(x){var t=fmt(x,1);return t.replace(",0","").replace(","," Komma ")}
+
+/* Zustände, die angesagt werden. Jeder muss eine Weile stehen, bevor er
+   gilt — sonst redet das Tablet bei jedem 5-Hz-Flackern. */
+var Z={};
+function zustand(name,wert,halteS){
+  var s=Z[name],jetzt=performance.now()/1000;
+  if(!s){Z[name]={wert:wert,kandidat:wert,seit:jetzt,erst:true};return null}
+  if(wert!==s.kandidat){s.kandidat=wert;s.seit=jetzt;return null}
+  if(wert!==s.wert&&jetzt-s.seit>=halteS){var alt=s.wert;s.wert=wert;return {alt:alt,neu:wert}}
+  return null;
+}
+/* Wird eine Ansage gerade nicht gesprochen (zu dicht an der vorigen), gilt
+   der Wechsel als noch nicht gemeldet und kommt beim nächsten Takt wieder. */
+function melde(name,w,text,art,sofort){if(sagen(text,art,sofort)===false)Z[name].wert=w.alt}
+function ansagenPruefen(){
+  if(!Rolle)return;
+  var weg=verbindungWeg(),w;
+  w=zustand("rechner",weg?"weg":"da",2.0);
+  if(w){if(w.neu==="weg")melde("rechner",w,"Verbindung zum Rechner unterbrochen.","rot",true);else melde("rechner",w,"Verbindung zum Rechner wieder da.","gruen")}
+  if(weg)return;
+  var v=frischerVektor(),g=!v?"kein":v.art==="fix"?"fix":v.art==="float"?"float":"grob";
+  w=zustand("guete",g,2.0);
+  if(w){
+    if(w.neu==="fix")melde("guete",w,"R T K fix. Zentimeter.","gruen");
+    else if(w.alt==="fix"&&w.neu==="float")melde("guete",w,"Achtung. Fix verloren. Nur Float.","gelb",true);
+    else if(w.neu==="float")melde("guete",w,"Nur Float.","gelb");
+    else if(w.neu==="grob")melde("guete",w,"Kein R T K. Nur Meter.","rot",true);
+    else if(w.neu==="kein"&&(w.alt==="fix"||w.alt==="float"))melde("guete",w,"Kein Vektor.","rot",true);
+  }
+  var f=(Daten&&Daten.funk)||{};
+  w=zustand("funk",f.verbunden?"steht":"weg",2.0);
+  if(w){if(w.neu==="weg")melde("funk",w,"Funkverbindung zum anderen Fahrzeug abgerissen.","rot",true);else melde("funk",w,"Funkverbindung steht wieder.","gruen")}
+  if(haeck()){
+    var dr=dranZeile();
+    w=zustand("dran",dr?(dr.name||dr.kennung):"",3.0);
+    if(w&&w.neu)melde("dran",w,w.neu+" ist dran.","gold");
+    var namen=kettenliste().filter(function(z){return z.zustand!=="bekannt"&&z.zustand!=="weg"}).map(function(z){return z.name||z.kennung}).sort().join("|");
+    w=zustand("angemeldet",namen,1.0);
+    if(w){var neu=w.neu.split("|").filter(function(n){return n&&w.alt.split("|").indexOf(n)<0});if(neu.length)melde("angemeldet",w,neu.join(" und ")+" angemeldet.","gold")}
+  }else{
+    var mein=ich(),s=mein&&mein.dran?"dran":mein&&mein.naechster?"naechster":"sonst";
+    w=zustand("ich",s,2.0);
+    if(w){if(w.neu==="dran")melde("ich",w,"Du bist dran.","gold");else if(w.neu==="naechster")melde("ich",w,"Du bist als Nächstes dran.","gold")}
+  }
+}
+
+/* ============================================= Protokoll auf dem Pi (/hmi) */
+function hmi(art,text){
+  try{
+    fetch("/hmi",{method:"POST",headers:kopf(),
+      body:JSON.stringify({art:art,text:text||"",sicht:UI.sicht,tablet_zeit:Date.now()/1000})}).catch(function(){});
+  }catch(e){}
+}
+
+/* ================================================================ Bedienung */
+geraet.addEventListener("click",function(ev){
+  var t=ev.target.closest("[data-act]");if(!t)return;
+  var a=t.getAttribute("data-act"),arg=t.getAttribute("data-arg");
+  if(a==="licht"){licht(tag()?"nacht":"tag",true);return}
+  if(a==="ton"){TON=!TON;speicher("vyrel_ton",TON?"an":"aus");hmi("taste","Ton "+(TON?"an":"aus"));if(TON)sagen("Ansagen sind an.","gold",true);aktualisieren();return}
+  if(a==="auftrag"){hmi("sicht","auftrag");location.href=window.VYREL_AUFTRAG_URL||"/auftrag";return}
+  if(a==="sicht"){if(UI.sicht!==arg){UI.sicht=arg;UI.tafel=0;Meldung=null;hmi("sicht",arg);if(arg==="massband"||arg==="pruefliste"||arg==="menue"||arg==="system")ttHolen()}aufbauen();return}
+  if(a==="tafel"){UI.tafel=+arg;aufbauen();return}
+  if(a==="fest"){var k=kette();festhalten(arg&&k.festgehalten===arg?"":arg);return}
+  if(a==="messart"){UI.messart=arg;MB.fehler="";aktualisieren();return}
+  if(a==="probe"){probeSpeichern();return}
+  if(a==="haken"){var p=TT&&TT.pruefliste.punkte.filter(function(x){return x.id===arg})[0];if(p)pruefpunkt({id:arg,erledigt:!p.erledigt});return}
+  if(a==="speichern"){konfigSpeichern();return}
+  if(a==="verwerfen"){Entwurf={};Meldung=null;konfigHolen();return}
+});
+geraet.addEventListener("change",function(ev){
+  var id=ev.target.getAttribute&&ev.target.getAttribute("data-notiz");
+  if(id){ev.target._stand=ev.target.value;pruefpunkt({id:id,notiz:ev.target.value})}
+});
+geraet.addEventListener("keydown",function(ev){
+  if(ev.key==="Enter"&&ev.target&&(ev.target.id==="mb-band"||ev.target.id==="mb-notiz")){ev.preventDefault();probeSpeichern()}
+  if(ev.key==="Enter"&&ev.target&&ev.target.getAttribute&&ev.target.getAttribute("data-notiz"))ev.target.blur();
+});
+/* Die erste Berührung schaltet Ton und Sprache frei — Browser lassen sie
+   vorher nicht zu. Dazu die Bitte, den Bildschirm anzulassen. */
+document.addEventListener("pointerdown",function(){
+  try{if(!AUDIO&&(window.AudioContext||window.webkitAudioContext))AUDIO=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}
+  try{if(window.speechSynthesis){var u=new SpeechSynthesisUtterance(" ");u.volume=0;window.speechSynthesis.speak(u);stimmenLaden()}}catch(e){}
+  try{if(navigator.wakeLock)navigator.wakeLock.request("screen").catch(function(){})}catch(e){}
+},{once:true});
+
+function licht(m,vonHand){
+  root.classList.remove("tag","nacht");root.classList.add(m);
+  var mt=document.querySelector('meta[name="theme-color"]');if(mt)mt.setAttribute("content",m==="tag"?"#e9ecef":"#06090d");
+  if(vonHand){speicher("vyrel_licht",m+"|"+new Date().toDateString());hmi("taste","Licht "+m)}
+  aktualisieren();
+}
+/* Vorgabe aus der Uhr; eine Wahl von Hand gilt bis zum Abend desselben Tages. */
+(function(){
+  var h=new Date().getHours(),m=(h>=6&&h<20)?"tag":"nacht",g=speicherAlt("vyrel_licht","franz_licht");
+  if(g){var t=g.split("|");if(t[1]===new Date().toDateString())m=t[0]}
+  root.classList.add(m);
+})();
+
+/* ================================================================ Takt */
+function holen(){
+  /* Nur eine echte Antwort zählt als Lebenszeichen. Eine Fehlerseite des
+     Pi (500, 503) hieß vorher "Rechner antwortet" — und die Anzeige zeigte
+     KEIN VEKTOR statt KEINE VERBINDUNG. */
+  fetch("/daten",{cache:"no-store"}).then(function(a){if(!a.ok)throw new Error("HTTP "+a.status);return a.json()}).then(function(d){
+    if(!d||typeof d!=="object"||!("bereit" in d))throw new Error("kein Anzeigebild");
+    if(!gekoppelt(d)){aktualisieren();return}
+    Daten=d;LetzterEmpfang=Date.now();
+    if(d.rolle&&d.rolle!==Rolle){var erst=!Rolle;Rolle=d.rolle;if(erst){aufbauen();hmi("start","Anzeige geöffnet · "+navigator.userAgent.slice(0,120));return}}
+    aktualisieren();
+  }).catch(function(){aktualisieren()});
+}
+function knotenName(k){return (k.name||k.anzeigename||"")+" ("+(k.rolle==="abfahrer"?"Abfahrer":"Häcksler")+", "+(k.kennung||"?")+")"}
+function sperreAuf(){
+  var e=document.getElementById("sperre");
+  if(!Fremd){e.hidden=true;e.innerHTML="";return}
+  var netz=Kopplung.rolle==="abfahrer"?"VYREL-Abfahrer":"VYREL-Haecksler";
+  e.innerHTML='<h1>FALSCHER RECHNER</h1>'+
+    '<p>Dieses Tablet gehört zu <b>'+esc(knotenName(Kopplung))+'</b>.<br>Geantwortet hat <b>'+esc(knotenName(Fremd))+'</b>.</p>'+
+    '<p>Keine Werte, keine Eingaben. WLAN des Tablets prüfen: Es muss im Netz <b class="mono">'+netz+'</b> sein.</p>'+
+    '<button type="button" data-act="neukoppeln">Mit diesem Rechner neu koppeln …</button>';
+  e.hidden=false;
+}
+/* Prüft jede Antwort gegen die Kopplung. Ohne UUID (alter Stand des Pi)
+   ist keine Prüfung möglich, dann bleibt alles wie bisher. */
+function gekoppelt(d){
+  var k=d.kennung||{};
+  if(!k.uuid)return true;
+  if(!Kopplung)kopplungSetzen(k);
+  if(k.uuid!==Kopplung.uuid){if(!Fremd||Fremd.uuid!==k.uuid){Fremd=k;sperreAuf()}return false}
+  if(Fremd){Fremd=null;sperreAuf()}
+  return true;
+}
+document.getElementById("sperre").addEventListener("click",function(ev){
+  if(!ev.target.closest('[data-act="neukoppeln"]')||!Fremd)return;
+  if(!window.confirm("Dieses Tablet ab jetzt fest an "+knotenName(Fremd)+" koppeln?\n\nNur tun, wenn das Tablet wirklich in diese Kabine gehört."))return;
+  var vorher=Kopplung?Kopplung.kennung:"";
+  kopplungSetzen(Fremd);Fremd=null;Rolle="";Daten=null;TT=null;sperreAuf();
+  hmi("kopplung","Neu gekoppelt mit "+Kopplung.kennung+(vorher?", vorher "+vorher:""));
+  holen();
+});
+function ttHolen(){
+  if(Fremd)return;
+  fetch("/testtag",{cache:"no-store"}).then(function(a){return a.ok?a.json():null}).then(function(j){if(j){TT=j;if(UI.sicht!=="fahren")aktualisieren()}}).catch(function(){});
+}
+holen();ttHolen();
+setInterval(holen,400);
+/* Maßband und Prüfliste brauchen das Fenstermittel zügig, sonst reicht es selten. */
+setInterval(function(){if(UI.sicht==="massband"||UI.sicht==="pruefliste")ttHolen()},1000);
+setInterval(function(){if(UI.sicht!=="massband"&&UI.sicht!=="pruefliste")ttHolen()},5000);
+/* Wächter, unabhängig vom Abruf: Hängt eine Anfrage, statt zu scheitern,
+   kommt weder 'then' noch 'catch' — und ohne diesen Takt bliebe die
+   letzte Zahl stehen. */
+setInterval(function(){if(verbindungWeg())aktualisieren()},1000);
+var alteBreite=window.innerWidth<780;
+window.addEventListener("resize",function(){var s=window.innerWidth<780;if(s!==alteBreite){alteBreite=s;aufbauen()}else aktualisieren()});
+
+aufbauen();
+
+/* Für die Prüfung von außen. */
+window.ansicht=function(n){UI.sicht=n==="konfig"?"fahrzeuge":n;UI.tafel=0;aufbauen()};
+window.__ui=UI;window.__ansagen=ANSAGEN;window.__tafel=function(i){UI.tafel=i;aufbauen()};
+window.licht=licht;window.zeichnen=aktualisieren;
+})();
+</script>
+
+<style>
+body{display:flex;flex-direction:column}
+#geraet{flex:1 1 auto;min-height:0;height:auto!important}
+#vyrel_demo{flex:none;display:flex;gap:6px;align-items:center;background:#06090d;border-top:1px solid rgba(233,174,71,.45);
+  padding:5px max(10px,env(safe-area-inset-right,0px)) max(5px,env(safe-area-inset-bottom,0px)) max(10px,env(safe-area-inset-left,0px));
+  font:600 12.5px "IBM Plex Sans Condensed","Roboto Condensed","Arial Narrow",system-ui,sans-serif;color:#eef3f7;letter-spacing:.04em;overflow-x:auto;-webkit-overflow-scrolling:touch}
+#vyrel_demo b{color:#e9ae47;letter-spacing:.1em;margin-right:2px;white-space:nowrap}
+#vyrel_demo a{color:#eef3f7;text-decoration:none;padding:6px 10px;border-radius:999px;background:rgba(150,185,220,.12);white-space:nowrap}
+#vyrel_demo a.an{background:#e9ae47;color:#15100a}
+#vyrel_demo button{border:0;background:none;color:rgba(208,222,236,.7);font:inherit;padding:6px 8px;cursor:pointer;margin-left:auto}
+#vyrel_demo.zu a,#vyrel_demo.zu span{display:none}
+@media (max-width:500px){#vyrel_demo span{display:none}}
+</style>
+<nav id="vyrel_demo" aria-label="Vorführung">
+  <b>DEMO</b><span style="white-space:nowrap;opacity:.7">erfundene Fahrt</span>
+  <a href="../haecksler/" data-r="haecksler">Häcksler</a><a href="../abfahrer/" data-r="abfahrer">Abfahrer</a>
+  <a href="../auftrag/?rolle=haecksler&zurueck=../haecksler/">Auftrag</a><a href="../">Start</a>
+  <button type="button" aria-label="Menü einklappen">×</button>
+</nav>
+<script>
+(function(){var n=document.getElementById("vyrel_demo"),r=window.VYREL_DEMO_ROLLE;
+  n.querySelectorAll("[data-r]").forEach(function(a){if(a.getAttribute("data-r")===r)a.className="an"});
+  try{if(window.localStorage.getItem("vyrel_demo_menue")==="zu")n.className="zu"}catch(e){}
+  n.querySelector("button").onclick=function(){n.className=n.className?"":"zu";this.textContent=n.className?"›":"×";try{window.localStorage.setItem("vyrel_demo_menue",n.className||"auf")}catch(e){}};
+  if(n.className)n.querySelector("button").textContent="›";})();
+</script>
+</body>
+</html>
