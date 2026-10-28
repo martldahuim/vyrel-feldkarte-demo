@@ -307,7 +307,7 @@ ul.hinweise li{margin:3px 0}
       <section class="tafel" id="t_auftraege" data-normal aria-labelledby="h_auftraege">
         <h2 id="h_auftraege">Aufträge <span id="auftraege_n"></span></h2>
         <div class="zeilen" id="auftraege_liste"></div>
-        <div class="knopfreihe"><button type="button" class="knopf haupt breit" id="neu_auftrag">+ Neuer Auftrag</button></div>
+        <div class="knopfreihe"><button type="button" class="knopf haupt breit" id="neu_auftrag">+ Neuer Auftrag</button><a class="knopf breit" id="zur_feldkarte" hidden>Feldkarte ›</a></div>
         <p class="hinweis" id="auftraege_hinweis"></p>
       </section>
 
@@ -493,12 +493,17 @@ function auftraegeBauen(){
   $("auftraege_n").textContent=l.length?String(l.length):"";
   $("auftraege_liste").innerHTML=l.length?l.map(function(x){
     var loe=UI.loeschen===x.id;
-    return '<div class="zeile"><span class="n">'+esc(x.kunde||"ohne Kunde")+'<small>'+esc([x.name,felderText(x.felder)+" · "+de(x.ha,2)+" ha",x.datum?x.datum.split("-").reverse().join("."):""].filter(Boolean).join(" · "))+'</small></span>'+
+    return '<div class="zeile"><span class="n">'+esc(x.kunde||"ohne Kunde")+'<small>'+esc([x.feldkarte&&x.name!=="aus der Feldkarte"?"Feldkarte · "+x.name:x.name,felderText(x.felder)+" · "+de(x.ha,2)+" ha",x.datum?x.datum.split("-").reverse().join("."):""].filter(Boolean).join(" · "))+'</small></span>'+
       (x.aktiv?'<span class="gewaehlt">gewählt</span><span></span>':
        loe?'<button type="button" class="weg" data-loeschen-ja="'+esc(x.id)+'">Löschen</button><button type="button" data-loeschen-nein="1">Nein</button>':
        '<button type="button" data-waehlen="'+esc(x.id)+'">Wählen</button><button type="button" class="weg" data-loeschen="'+esc(x.id)+'" aria-label="Auftrag löschen">×</button>')+'</div>'}).join("")
     :'<p class="leer">Noch kein Auftrag. Mit „Neuer Auftrag“ Felder auf der Karte antippen.</p>';
   var nb=(S.bestand||[]).length;
+  if(DEMO&&DEMOSIM){
+    $("auftraege_hinweis").textContent=DEMOSIM.ausFeldkarte()
+      ?"Aufträge „aus der Feldkarte“: je Kunde einer, mit den dort markierten Feldern. Feldkarte ändern, zurückkommen — der Auftrag zieht nach."+(DEMOSIM.ohneGrenze()?" "+DEMOSIM.ohneGrenze()+" Markierung(en) ohne Feldgrenze: in der Feldkarte einmal hinzoomen.":"")
+      :"Noch nichts in der Feldkarte markiert. Dort Felder mit Kunde markieren — sie kommen hier als Auftrag je Kunde an.";
+    return}
   $("auftraege_hinweis").textContent=nb?nb+" Felder im Bestand. "+(S.status==="laeuft"||S.status==="pause"?"Wählen beendet den laufenden Auftrag; seine Stunden bleiben.":""):"Noch keine Felder im Bestand: unter „Felder einlesen“ die Datei aus der Feldkarte nehmen.";
 }
 $("auftraege_liste").addEventListener("click",function(e){var b=e.target.closest("button");if(!b)return;
@@ -804,9 +809,9 @@ var DEMOSIM=(function(){
   var Z={rolle:param("rolle")==="abfahrer"?"abfahrer":"haecksler",bestand:{},auftraege:{},aktiv:null,status:"offen",seit:T0,vorschau:null,eigen:false,
     konten:{},hand:{},silo:{lat:HOME[0]-0.0004,lon:HOME[1]-0.0006},bahn:null,bahnFeld:null,spur:{haecksler:[],abfahrer:[]},letzt:T0,pos:{}};
   function bestandSetzen(liste){Z.bestand={};liste.forEach(function(f){Z.bestand[f.id]=f})}
-  function auftragNeu(kunde,name,ids,gang){var felder=ids.map(function(i){return Z.bestand[i]}).filter(Boolean);
+  function auftragNeu(kunde,name,ids,gang,festId){var felder=ids.map(function(i){return Z.bestand[i]}).filter(Boolean);
     var vor=null;Object.keys(Z.auftraege).forEach(function(k){var x=Z.auftraege[k];if(x.kunde.name.toLowerCase()===kunde.toLowerCase())vor=x});
-    var id="A-"+datum.replace(/-/g,"")+"-"+(Math.abs(hash(kunde+ids.sort().join("|")))%0xFFFFFF).toString(16).toUpperCase();
+    var id=festId||("A-"+datum.replace(/-/g,"")+"-"+(Math.abs(hash(kunde+ids.slice().sort().join("|")))%0xFFFFFF).toString(16).toUpperCase());
     var a={typ:"vyrel-auftrag",id:id,name:name||"",datum:datum,kunde:vor?JSON.parse(JSON.stringify(vor.kunde)):{name:kunde,anschrift:"",ansprechpartner:"",telefon:""},arbeitsgang:gang||"Häckseln",
       saetze:vor?JSON.parse(JSON.stringify(vor.saetze)):{haecksler_eur_h:265,abfahrer_eur_h:68},abrechnung:vor?JSON.parse(JSON.stringify(vor.abrechnung)):{haecksler:"feld",abfahrer:"einsatz",runden_h:0.1},
       felder:felder,silo:vor?vor.silo:{lat:Z.silo.lat,lon:Z.silo.lon},abfahrer_hand:vor?JSON.parse(JSON.stringify(vor.abfahrer_hand)):[],notiz:"",angelegt:Date.now()};
@@ -879,7 +884,7 @@ var DEMOSIM=(function(){
           if(ring[0][0]===ring[ring.length-1][0]&&ring[0][1]===ring[ring.length-1][1])ring.pop();out.push({id:"osm-"+e.id,ring:ring,name:e.tags&&e.tags.name})});
         if(out.length<4)throw new Error("zu wenig");return out})}
   function uebernehmenEcht(roh,quelle){
-    if(Z.eigen)return;var l=[];
+    if(Z.eigen||QUELLE==="Feldkarte")return;var l=[];
     roh.forEach(function(r){var ha=flaeche(r.ring);if(ha<0.5||ha>30)return;
       var c=xy(r.ring.reduce(function(m,p){return [m[0]+p[0]/r.ring.length,m[1]+p[1]/r.ring.length]},[0,0]));
       l.push({id:r.id,name:r.name||"",kunde:"",ha:Math.round(ha*100)/100,grenze:[r.ring],d:Math.hypot(c[0],c[1])})});
@@ -888,7 +893,64 @@ var DEMOSIM=(function(){
     var kunden=["Hof Huber","Hof Huber","Hof Berger","Hof Berger","Bioenergie Linder GbR","Bioenergie Linder GbR"];
     l.forEach(function(f,i){if(!f.name)f.name=namen[i%namen.length]+(i>=namen.length?" "+(Math.floor(i/namen.length)+1):"");f.kunde=kunden[i%kunden.length];delete f.d});
     start(l,quelle);sichern();UI.ansicht=null;holen();return true}
-  if(window.fetch&&window.DOMParser&&!gemerkt){
+  /* ---- Feldkarte im Auftrag ------------------------------------------------
+     Die Feldkarte liegt in der Vorführung unter derselben Adresse
+     (…/feldkarte/) und merkt sich ihre Markierungen im Browser
+     (vyrel-feldkarte-live-v1). Diese Seite liest sie: Die markierten Felder
+     sind der Feldbestand, und je Kunde entsteht ein Auftrag „aus der
+     Feldkarte“ mit genau dessen Feldern. Ändert man in der Feldkarte etwas,
+     zieht der Auftrag beim Zurückkommen nach. Die Feld-Kennungen sind
+     dieselben wie in der Datei „Für den Pi“. */
+  var FK_KEY="vyrel-feldkarte-live-v1",FK_KUNDEN={k1:"Hof Huber",k2:"Hof Berger",k3:"Eigenbetrieb"},FK_SIG=null;
+  function fkLesen(){var st=null;try{st=JSON.parse(window.localStorage.getItem(FK_KEY)||"null")}catch(e){st=null}
+    var m=(st&&st.marks)||{},out=[];
+    Object.keys(m).forEach(function(k){var x=m[k];if(!x||!x.rings||!x.rings[0]||x.rings[0].length<3)return;
+      var ringe=x.rings.map(function(ring){var q=ring.map(function(p){return [+p[0],+p[1]]});
+        if(q.length>3&&q[0][0]===q[q.length-1][0]&&q[0][1]===q[q.length-1][1])q.pop();return q});
+      var ha=x.ha>0?x.ha:flaeche(ringe[0]);
+      out.push({id:k.replace(/[^A-Za-z0-9_.:-]/g,"_"),name:x.name||(x.label?"Feldstück "+x.label:"Feldstück"),kunde:FK_KUNDEN[x.kunde]||String(x.kunde||"ohne Kunde"),
+        ha:Math.round(ha*100)/100,grenze:ringe,schritte:(x.steps||[]).slice(),feldkarte:true})});
+    var roh=JSON.stringify(m);
+    return {felder:out,ohne:Object.keys(m).length-out.length,sig:roh.length+":"+hash(roh)}}
+  function fkGang(fs){var g={};fs.forEach(function(f){(f.schritte||[]).forEach(function(x){g[x]=1})});
+    return g.H?"Häckseln":g.L?"Ladewagen":g.M?"Mähen":g.S?"Schwaden":g.W?"Wenden":"Häckseln"}
+  function fkId(k){return "A-"+datum.replace(/-/g,"")+"-FK"+("000"+(Math.abs(hash(k))%0xFFFF).toString(16).toUpperCase()).slice(-4)}
+  var FK_OHNE=0;
+  function fkAbgleichen(){
+    var fk=fkLesen();FK_OHNE=fk.ohne;
+    if(!fk.felder.length){
+      if(QUELLE==="Feldkarte"){FK_SIG=fk.sig;start(ERF,"erfunden");Z.eigen=false;sichern();return true}
+      return false}
+    if(fk.sig===FK_SIG&&QUELLE==="Feldkarte")return false;
+    FK_SIG=fk.sig;
+    var nachKunde={},kunden=[];fk.felder.forEach(function(f){if(!nachKunde[f.kunde]){nachKunde[f.kunde]=[];kunden.push(f.kunde)}nachKunde[f.kunde].push(f)});
+    if(QUELLE!=="Feldkarte"){
+      /* Zum ersten Mal Markierungen: die erfundenen Felder und Aufträge weg. */
+      bestandSetzen(fk.felder);QUELLE="Feldkarte";Z.auftraege={};Z.konten={};Z.hand={};Z.aktiv=null;Z.eigen=true;
+      kunden.forEach(function(k){var a=auftragNeu(k,"aus der Feldkarte",nachKunde[k].map(function(f){return f.id}),fkGang(nachKunde[k]),fkId(k));a.feldkarte=true;a.fk_kunde=k});
+      var erst=Z.auftraege[fkId(kunden[0])];
+      erst.abfahrer_hand=[{id:"h1",name:"Fendt 728 · Toni"},{id:"h2",name:"MF 7480 · Sepp"}];
+      Z.hand={h1:{laeuft:false,s:0,seit:null},h2:{laeuft:false,s:0,seit:null}};
+      Z.aktiv=erst.id;Z.status="offen";Z.seit=Date.now()/1000;
+    }else{
+      /* Abgleich: Bestand neu, Aufträge aus der Feldkarte nachziehen, eigene behalten. */
+      bestandSetzen(fk.felder);
+      kunden.forEach(function(k){var id=fkId(k),a=Z.auftraege[id],ids=nachKunde[k].map(function(f){return f.id});
+        if(a){a.felder=ids.map(function(i){return Z.bestand[i]});a.arbeitsgang=fkGang(nachKunde[k])}
+        else{a=auftragNeu(k,"aus der Feldkarte",ids,fkGang(nachKunde[k]),id);a.feldkarte=true;a.fk_kunde=k}});
+      Object.keys(Z.auftraege).forEach(function(id){var a=Z.auftraege[id];
+        if(a.feldkarte&&!nachKunde[a.fk_kunde]&&id!==Z.aktiv){delete Z.auftraege[id];return}
+        if(!a.feldkarte)a.felder=a.felder.map(function(f){return Z.bestand[f.id]||f})});
+      if(!Z.aktiv||!Z.auftraege[Z.aktiv]){Z.aktiv=fkId(kunden[0]);Z.status="offen";Z.seit=Date.now()/1000}
+    }
+    Z.bahn=null;sichern();return true}
+  var fkDa=fkLesen().felder.length>0;
+  if(fkDa||QUELLE==="Feldkarte")fkAbgleichen();
+  function fkPruefen(){if(fkAbgleichen()){UI.ansicht=null;tastenSchluessel="";holen()}}
+  window.addEventListener("storage",function(e){if(e.key===FK_KEY)fkPruefen()});
+  window.addEventListener("pageshow",fkPruefen);window.addEventListener("focus",fkPruefen);
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)fkPruefen()});
+  if(window.fetch&&window.DOMParser&&!gemerkt&&!fkDa){
     invekos().then(function(r){if(uebernehmenEcht(r,"InVeKoS Bayern (amtlich)")===false)throw new Error("leer")})
       .catch(function(){return osm().then(function(r){uebernehmenEcht(r,"OpenStreetMap")})}).catch(function(){});
   }
@@ -938,7 +1000,7 @@ var DEMOSIM=(function(){
     var hand=A&&r==="haecksler"?A.abfahrer_hand.map(function(x){var z=Z.hand[x.id]||{laeuft:false,s:0,seit:null},st=rund(z.s/3600,A.abrechnung.runden_h);
       return {id:x.id,name:x.name,laeuft:z.laeuft,seit:z.seit,abrechnung_s:z.s,stunden:st,betrag:A.saetze.abfahrer_eur_h!=null?st*A.saetze.abfahrer_eur_h:null}}):[];
     var liste=Object.keys(Z.auftraege).map(function(i){var x=Z.auftraege[i];return {id:x.id,kunde:x.kunde.name,name:x.name,datum:x.datum,felder:x.felder.length,
-      ha:x.felder.reduce(function(s,f){return s+f.ha},0),aktiv:x.id===Z.aktiv,angelegt:x.angelegt}}).sort(function(a,b){return b.angelegt-a.angelegt});
+      ha:x.felder.reduce(function(s,f){return s+f.ha},0),aktiv:x.id===Z.aktiv,angelegt:x.angelegt,feldkarte:!!x.feldkarte}}).sort(function(a,b){return (b.feldkarte?1:0)-(a.feldkarte?1:0)||b.angelegt-a.angelegt});
     var andere=L?Z.pos[r==="haecksler"?"abfahrer":"haecksler"]:null;
     return {ok:true,demo:true,rolle:r,knoten:{name:r==="haecksler"?"BiG X 650":"Fendt 724 + Jumbo"},jetzt:Date.now()/1000,status:A?Z.status:"offen",status_seit:Z.seit,auftrag:A,
       auftraege:liste,bestand:Object.keys(Z.bestand).map(function(i){return Z.bestand[i]}),
@@ -989,13 +1051,15 @@ var DEMOSIM=(function(){
       return {stand:stand(),text:"Auftrag "+(a4?a4.kunde.name:"")+" gelöscht. Seine Stunden bleiben im Stundenzettel."}}
     return {fehler:"unbekannt"}}
   return {stand:stand,post:post,beispieldatei:beispieldatei,rolle:function(r){Z.rolle=r;sichern()},quelle:function(){return QUELLE},zuruecksetzen:zuruecksetzen,
-    text:function(){return "Felder: "+QUELLE}};
+    text:function(){return QUELLE==="Feldkarte"?"Felder aus der Feldkarte: "+Object.keys(Z.bestand).length+" markiert"+(FK_OHNE?" ("+FK_OHNE+" ohne Grenze)":""):"Felder: "+QUELLE},
+    ausFeldkarte:function(){return QUELLE==="Feldkarte"},ohneGrenze:function(){return FK_OHNE}};
 })();
 if(DEMO){
   var links=[],an=param("anzeige");
   if(an&&/^[\w./-]+$/.test(an)&&an.indexOf("//")<0)links.push('<a class="klein" href="'+esc(an)+'">‹ Anzeige</a>');
   (window.VYREL_DEMO_LINKS||[]).forEach(function(l){if(/^[\w./?=&-]+$/.test(l[1])&&l[1].indexOf("//")<0)links.push('<a class="klein" href="'+esc(l[1])+'">'+esc(l[0])+'</a>')});
   links.push('<button type="button" class="klein" id="demo_neu">Von vorn</button>');
+  (window.VYREL_DEMO_LINKS||[]).forEach(function(l){if(l[0]==="Feldkarte"&&/^[\w./?=&-]+$/.test(l[1])){$("zur_feldkarte").href=l[1];$("zur_feldkarte").hidden=false}});
   $("demo_links").innerHTML=links.join("");
   $("demo_neu").onclick=function(){if(this.getAttribute("data-sicher")){DEMOSIM.zuruecksetzen();return}this.setAttribute("data-sicher","1");this.textContent="Wirklich alles neu?";
     var b=this;setTimeout(function(){b.removeAttribute("data-sicher");b.textContent="Von vorn"},4000)};

@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="de">
 <head>
+<meta name="robots" content="noindex, nofollow">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VYREL Feldkarte Bayerstetten</title>
@@ -10,7 +11,10 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
 <!--
-  Stand 28.10.2026: Neu ist der Abschnitt „Für den Pi". Er gibt die markierten
+  Stand 28.10.2026 abends: Liegt die Feldkarte neben der Seite AUFTRAG
+  (Vorführung …/feldkarte/ und …/auftrag/), liest AUFTRAG die Markierungen
+  direkt aus dem Browser; oben führt „Auftrag ›“ hinüber.
+  Neu ist der Abschnitt „Für den Pi". Er gibt die markierten
   Felder als VYREL-Auftrag aus (Datei sichern oder Text kopieren). Die Seite
   AUFTRAG auf dem Tablet (http://192.168.60.1:8080/auftrag) liest genau das
   ein. Beim Markieren wird die Feldgrenze jetzt mitgespeichert, damit die
@@ -44,6 +48,9 @@ header{display:flex;align-items:center;gap:10px 22px;flex-wrap:wrap;background:v
 .brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.06em;display:flex;gap:10px;align-items:baseline}
 .brand span{font-weight:500;letter-spacing:.02em;color:var(--muted)}
 .steps{display:flex;gap:6px;list-style:none;margin:0;padding:0;flex-wrap:wrap}
+.zumauftrag{margin-left:auto;display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:12px;background:var(--accent);color:var(--accent-fg);
+  font-family:var(--display);font-weight:700;font-size:17px;letter-spacing:.03em;text-decoration:none;white-space:nowrap}
+a.ghost{display:flex;align-items:center;justify-content:center;text-decoration:none;color:var(--fg)}
 .steps li{font-family:var(--display);font-weight:600;font-size:15px;padding:5px 12px;border-radius:999px;background:var(--chip);color:var(--muted);display:flex;gap:8px;align-items:center}
 .steps li b{font-family:var(--mono);font-size:12px;font-weight:500;opacity:.8}
 .steps li.on{background:var(--fg);color:var(--bg)}
@@ -144,6 +151,7 @@ details.src summary{font-family:var(--display);font-weight:600;font-size:16px;cu
       <li data-s="2"><b>2</b>Feld antippen</li>
       <li data-s="3"><b>3</b>Markieren</li>
     </ol>
+    <a class="zumauftrag" id="zumAuftrag" href="../auftrag/?rolle=haecksler" hidden>Auftrag ›</a>
   </header>
   <div class="main">
     <div class="mapwrap">
@@ -399,12 +407,18 @@ function alsAuftrag(){
       arbeitsgaenge:m.steps.slice(),grenze:r.map(ring=>ring.map(q=>[Math.round(q[0]*1e7)/1e7,Math.round(q[1]*1e7)/1e7]))})});
   return {daten:{typ:'vyrel-auftrag',version:1,quelle:'VYREL Feldkarte Bayerstetten',erstellt:new Date().toISOString(),felder:felder},fehlt:fehlt};
 }
+/* In der Vorführung (…/feldkarte/ neben …/auftrag/) liest AUFTRAG die
+   Markierungen direkt aus diesem Browser — ohne Datei. */
+const NEBEN_AUFTRAG=/^https?:$/.test(location.protocol)&&/\/feldkarte\/(index\.html)?$/.test(location.pathname);
+if(NEBEN_AUFTRAG)document.getElementById('zumAuftrag').hidden=false;
 function piHTML(){
   const n=Object.keys(marks).length;if(!n)return '';
   const a=alsAuftrag();
   return '<section><h3>Für den Pi</h3><p class="note" style="margin-top:4px">'+a.daten.felder.length+' markierte Felder als Auftrag für das Tablet im Schlepper. Dort unter AUFTRAG → „Auftrag bearbeiten“ einlesen.'+
     (a.fehlt.length?' '+a.fehlt.length+' Feld(er) ohne gespeicherte Grenze: einmal hinzoomen, bis sie geladen sind, oder neu markieren.':'')+'</p>'+
-    '<div class="actions"><button class="primary" data-act="pi_datei"'+(a.daten.felder.length?'':' disabled')+'>Datei sichern</button>'+
+    (NEBEN_AUFTRAG?'<p class="note">Hier in der Vorführung stehen die markierten Felder ohne Datei im AUFTRAG — je Kunde ein Auftrag.</p>':'')+
+    '<div class="actions">'+(NEBEN_AUFTRAG?'<a class="ghost" href="../auftrag/?rolle=haecksler">Im Auftrag öffnen ›</a>':'')+
+    '<button class="primary" data-act="pi_datei"'+(a.daten.felder.length?'':' disabled')+'>Datei sichern</button>'+
     '<button class="ghost" data-act="pi_kopieren"'+(a.daten.felder.length?'':' disabled')+'>Text kopieren</button></div>'+
     (piText?'<textarea class="pitext" id="pitext" readonly aria-label="Auftrag als Text">'+esc(JSON.stringify(a.daten))+'</textarea>':'')+'</section>';
 }
